@@ -1,0 +1,35 @@
+name: neo_cupertino
+description: Next-Generation iOS (iOS 26) UI Kit for Flutter featuring Liquid Glass Shaders, Neo-Cupertino controls, and Native Platform Views.
+version: 1.0.0
+homepage: https://github.com/MohamedGasser15/neo_cupertino
+repository: https://github.com/MohamedGasser15/neo_cupertino
+publish_to: none
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  svg_flutter: ^0.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.mohamedgasser.neo_cupertino
+        pluginClass: NeoCupertinoPlugin
+      ios:
+        pluginClass: NeoCupertinoPlugin
+  shaders:
+    - shaders/lightweight_glass.frag
+    - shaders/interactive_indicator.frag
+    - shaders/liquid_glass_geometry_blended.frag
+    - shaders/liquid_glass_render.frag
+    - shaders/progressive_blur.frag
