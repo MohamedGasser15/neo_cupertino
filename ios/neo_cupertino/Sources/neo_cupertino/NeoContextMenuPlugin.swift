@@ -69,6 +69,9 @@ public final class NeoContextMenuPlugin: NSObject, FlutterPlugin {
 
     cleanupAnchorButton()
 
+    let isDark = (dictionary["isDark"] as? Bool) ?? (dictionary["dark"] as? Bool)
+    let isRtl = (dictionary["isRtl"] as? Bool) ?? false
+
     let anchorRect = resolvedAnchorRect(from: dictionary, in: rootView)
     let button = NoHighlightButton(type: .system)
     button.frame = anchorRect
@@ -76,6 +79,12 @@ public final class NeoContextMenuPlugin: NSObject, FlutterPlugin {
     button.showsTouchWhenHighlighted = false
     button.adjustsImageWhenHighlighted = false
     button.showsMenuAsPrimaryAction = true
+    if let isDark = isDark {
+      if #available(iOS 13.0, *) {
+        button.overrideUserInterfaceStyle = isDark ? .dark : .light
+      }
+    }
+    button.semanticContentAttribute = isRtl ? .forceRightToLeft : .forceLeftToRight
     button.onDismiss = { [weak self, weak button] in
       guard let self = self, let button = button else { return }
       self.sendDismissed(instanceId: instanceId)

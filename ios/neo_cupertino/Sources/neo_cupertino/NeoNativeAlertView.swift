@@ -5,12 +5,18 @@ import UIKit
 class TintAdjustingAlertController: UIAlertController {
     private var backgroundDimmingView: UIView?
     var customTintColor: UIColor?
+    var isRtl: Bool = false
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
         if let customTint = customTintColor {
             view.tintColor = customTint
+        }
+
+        if isRtl {
+            view.semanticContentAttribute = .forceRightToLeft
+            applyRtlRecursively(to: view)
         }
 
         // Disable automatic tint adjustment
@@ -48,6 +54,9 @@ class TintAdjustingAlertController: UIAlertController {
     }
 
     private func addCustomDimmingView() {
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 {
+            return
+        }
         guard let presentingVC = presentingViewController,
               backgroundDimmingView == nil else { return }
 
@@ -76,6 +85,25 @@ class TintAdjustingAlertController: UIAlertController {
 
         backgroundDimmingView = nil
     }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if isRtl {
+            view.semanticContentAttribute = .forceRightToLeft
+            applyRtlRecursively(to: view)
+        }
+    }
+
+    private func applyRtlRecursively(to parent: UIView) {
+        parent.semanticContentAttribute = .forceRightToLeft
+        if let label = parent as? UILabel {
+            label.textAlignment = .right
+            label.semanticContentAttribute = .forceRightToLeft
+        }
+        for subview in parent.subviews {
+            applyRtlRecursively(to: subview)
+        }
+    }
 }
 
 /// Platform view for iOS 26 alert dialog
@@ -99,6 +127,7 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
         var iconColor: UIColor? = nil
         var oneTimeCode: String? = nil
         var isDark: Bool = false
+        var isRtl: Bool = false
         var tint: UIColor? = nil
         var alertStyleParam: String = "glass"
         var textFieldPlaceholder: String? = nil
@@ -118,6 +147,9 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
             if let ic = dict["iconColor"] as? NSNumber { iconColor = UIColor(argb: ic.intValue) }
             if let otc = dict["oneTimeCode"] as? String { oneTimeCode = otc }
             if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
+            else if let v = dict["isDark"] as? Bool { isDark = v }
+            if let r = dict["isRtl"] as? NSNumber { isRtl = r.boolValue }
+            else if let r = dict["isRtl"] as? Bool { isRtl = r }
             if let t = dict["tint"] as? NSNumber { tint = UIColor(argb: t.intValue) }
             if let alertStyleValue = dict["alertStyle"] as? String { alertStyleParam = alertStyleValue }
             if let tfp = dict["textFieldPlaceholder"] as? String { textFieldPlaceholder = tfp }
@@ -142,6 +174,7 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
             iconColor: iconColor,
             oneTimeCode: oneTimeCode,
             isDark: isDark,
+            isRtl: isRtl,
             tint: tint,
             textFieldPlaceholder: textFieldPlaceholder,
             textFieldInitialValue: textFieldInitialValue,
@@ -168,6 +201,7 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
         iconColor: UIColor?,
         oneTimeCode: String?,
         isDark: Bool,
+        isRtl: Bool,
         tint: UIColor?,
         textFieldPlaceholder: String?,
         textFieldInitialValue: String?,
@@ -177,13 +211,50 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
     ) {
         alertController = TintAdjustingAlertController(title: title, message: message, preferredStyle: .alert)
         guard let alert = alertController else { return }
+        alert.isRtl = isRtl
+
+        if isRtl {
+            alert.view.semanticContentAttribute = .forceRightToLeft
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.alignment = .right
+            paragraphStyle.baseWritingDirection = .rightToLeft
+
+            let titleFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
+            let titleColor = isDark ? UIColor.white : UIColor.black
+            let attributedTitle = NSAttributedString(
+                string: title,
+                attributes: [
+                    .font: titleFont,
+                    .foregroundColor: titleColor,
+                    .paragraphStyle: paragraphStyle
+                ]
+            )
+            alert.setValue(attributedTitle, forKey: "attributedTitle")
+
+            if let messageText = message, !messageText.isEmpty {
+                let messageFont = UIFont.systemFont(ofSize: 13, weight: .regular)
+                let messageColor = isDark ? UIColor(white: 0.7, alpha: 1.0) : UIColor(white: 0.4, alpha: 1.0)
+                let attributedMessage = NSAttributedString(
+                    string: messageText,
+                    attributes: [
+                        .font: messageFont,
+                        .foregroundColor: messageColor,
+                        .paragraphStyle: paragraphStyle
+                    ]
+                )
+                alert.setValue(attributedMessage, forKey: "attributedMessage")
+            }
+        }
 
         if #available(iOS 13.0, *) {
             alert.overrideUserInterfaceStyle = isDark ? .dark : .light
         }
 
-        // Apply liquid glass styling for iOS 15+
-        if #available(iOS 15.0, *) {
+        let isIOS26OrHigher = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26
+
+        // Apply liquid glass styling for iOS 15-25 (iOS 26+ has native liquid glass presentation)
+        if !isIOS26OrHigher, #available(iOS 15.0, *) {
             alert.view.layer.cornerRadius = 28.0
             alert.view.layer.cornerCurve = .continuous
             alert.view.layer.shadowOpacity = 0.1
@@ -326,7 +397,10 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
                 let messageLabel = UILabel()
                 messageLabel.text = messageText
                 messageLabel.numberOfLines = 0
-                messageLabel.textAlignment = .center
+                messageLabel.textAlignment = isRtl ? .right : .center
+                if isRtl {
+                    messageLabel.semanticContentAttribute = .forceRightToLeft
+                }
                 messageLabel.font = UIFont.systemFont(ofSize: 13)
                 messageLabel.textColor = .secondaryLabel
                 messageLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -369,6 +443,13 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
                 textField.placeholder = placeholder
                 textField.text = textFieldInitialValue
                 textField.isSecureTextEntry = textFieldObscureText
+                if isRtl {
+                    textField.textAlignment = .right
+                    textField.semanticContentAttribute = .forceRightToLeft
+                } else {
+                    textField.textAlignment = .left
+                    textField.semanticContentAttribute = .forceLeftToRight
+                }
 
                 if let keyboardType = textFieldKeyboardType {
                     switch keyboardType {
@@ -395,25 +476,32 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
         // Add actions
         var primaryAction: UIAlertAction?
 
-        for (index, actionTitle) in actionTitles.enumerated() {
+        let actionIndices: [Int] = (isRtl && actionTitles.count == 2)
+            ? [1, 0]
+            : Array(0..<actionTitles.count)
+
+        for index in actionIndices {
+            let actionTitle = actionTitles[index]
             let style = index < actionStyles.count ? actionStyles[index] : "defaultAction"
             let enabled = index < actionEnabled.count ? actionEnabled[index] : true
             let isDarkMode: Bool = isDark
 
+            let neutralTextColor = isDarkMode ? UIColor.white : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
+            let effectiveAccent = tint ?? neutralTextColor
             let alertActionStyle: UIAlertAction.Style
             var textColor: UIColor?
             var textFont: UIFont?
 
             switch style {
-            case "cancel":
-                alertActionStyle = .default
-                textColor = isDarkMode ? UIColor.white : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
             case "destructive":
                 alertActionStyle = .destructive
                 textColor = UIColor.systemRed
+            case "cancel":
+                alertActionStyle = .cancel
+                textColor = neutralTextColor
             case "primary":
-                alertActionStyle = .default
-                textColor = isDarkMode ? UIColor.white : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
+                alertActionStyle = actionTitles.count == 1 ? .cancel : .default
+                textColor = effectiveAccent
                 textFont = .boldSystemFont(ofSize: 17)
             case "secondary":
                 alertActionStyle = .default
@@ -431,8 +519,8 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
                 alertActionStyle = .default
                 textColor = isDarkMode ? UIColor.tertiaryLabel.withAlphaComponent(0.6) : .tertiaryLabel
             default:
-                alertActionStyle = .default
-                textColor = isDarkMode ? UIColor.white : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
+                alertActionStyle = actionTitles.count == 1 ? .cancel : .default
+                textColor = effectiveAccent
             }
 
             let action = UIAlertAction(title: actionTitle, style: alertActionStyle) { [weak self] _ in
@@ -472,14 +560,8 @@ public class IOS26NativeAlertPlatformView: NSObject, FlutterPlatformView {
             }
         }
 
-        // Button Pill Background Tint (matches the capsule fill in the reference image):
-        // White Mode (Left): Smooth light grey pill #D4D4DC
-        // Dark Mode (Right): Smooth dark grey pill #38383B
-        let buttonPillTint = isDark
-            ? UIColor(red: 0.22, green: 0.22, blue: 0.24, alpha: 1.0)
-            : UIColor(red: 0.83, green: 0.83, blue: 0.86, alpha: 1.0)
-
-        let effectiveTint = tint ?? buttonPillTint
+        let defaultNeutral = isDark ? UIColor.white : UIColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 1.0)
+        let effectiveTint = tint ?? defaultNeutral
         alert.customTintColor = effectiveTint
         alert.view.tintColor = effectiveTint
 

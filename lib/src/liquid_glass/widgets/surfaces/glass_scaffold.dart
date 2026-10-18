@@ -434,6 +434,9 @@ class GlassScaffold extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     final topPad = mediaQuery.padding.top;
     final botPad = mediaQuery.padding.bottom;
+    final keyboardInset = mediaQuery.viewInsets.bottom;
+    final shouldAvoidBottomInset = resizeToAvoidBottomInset ?? true;
+    final effectiveBottomInset = shouldAvoidBottomInset ? keyboardInset : 0.0;
 
     // In iPhone Duo's vertical bar strip a pinned app bar keeps only its
     // title row, and the package's bottom bars leave the bottom edge for the
@@ -530,13 +533,23 @@ class GlassScaffold extends StatelessWidget {
     final stackChildren = <Widget>[
       // 1. Body (bottom of stack — always below bars).
       if (extendBody)
-        Positioned.fill(child: bodyContent)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: effectiveBottomInset,
+          child: bodyContent,
+        )
       else
         Positioned(
           top: appBar != null ? topPad + effectiveAppBarHeight : 0,
           left: 0,
           right: 0,
-          bottom: bottomBar != null ? effectiveBottomBarHeight + botPad : 0,
+          bottom: bottomBar != null
+              ? (effectiveBottomInset > 0
+                  ? effectiveBottomInset + effectiveBottomBarHeight
+                  : effectiveBottomBarHeight + botPad)
+              : effectiveBottomInset,
           child: bodyContent,
         ),
 
@@ -632,7 +645,7 @@ class GlassScaffold extends StatelessWidget {
           top: bottomBarInStrip ? 0 : null,
           left: 0,
           right: 0,
-          bottom: 0,
+          bottom: effectiveBottomInset > 0 ? effectiveBottomInset : 0,
           child: SafeArea(
             top: false,
             left: false,
@@ -641,7 +654,11 @@ class GlassScaffold extends StatelessWidget {
             // (the 20px gap straddles the indicator).
             // Android uses a physical nav bar or gesture bar that requires
             // being pushed up explicitly.
-            bottom: defaultTargetPlatform == TargetPlatform.android,
+            // When lifted above the keyboard, home indicator safe area is omitted
+            // so keyboard insets and safe area are not applied twice.
+            bottom: effectiveBottomInset > 0
+                ? false
+                : defaultTargetPlatform == TargetPlatform.android,
             child: GlassIsolationScope(
               isolated: true,
               defaultQuality: GlassQuality.premium,
@@ -709,7 +726,13 @@ class GlassScaffold extends StatelessWidget {
       child: CupertinoPageScaffold(
         backgroundColor:
             effectiveBackground != null ? const Color(0x00000000) : null,
-        resizeToAvoidBottomInset: resizeToAvoidBottomInset ?? true,
+        // CupertinoPageScaffold's built-in resize is disabled so that background
+        // painting (in GlassPage and the scaffold itself) extends all the way to
+        // the screen's bottom behind the native iOS 26 translucent keyboard.
+        // Interactive layout avoidance is handled explicitly above on the
+        // body and bottom bar, preventing double-inset bugs and preserving
+        // scroll-to-focused-input behavior.
+        resizeToAvoidBottomInset: false,
         child: stackWidget,
       ),
     );

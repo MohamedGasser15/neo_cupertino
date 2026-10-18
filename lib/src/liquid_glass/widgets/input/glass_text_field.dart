@@ -77,6 +77,7 @@ class GlassTextField extends StatefulWidget {
     this.suffixSemanticLabel,
     this.obscureText = false,
     this.keyboardType,
+    this.keyboardAppearance,
     this.textInputAction,
     this.maxLines = 1,
     this.minLines,
@@ -147,6 +148,7 @@ class GlassTextField extends StatefulWidget {
     this.onTapOutside,
   })  : obscureText = false,
         keyboardType = TextInputType.text,
+        keyboardAppearance = null,
         textInputAction = TextInputAction.search,
         maxLines = 1,
         minLines = 1,
@@ -196,6 +198,16 @@ class GlassTextField extends StatefulWidget {
 
   /// The type of keyboard to display.
   final TextInputType? keyboardType;
+
+  /// The appearance of the keyboard.
+  ///
+  /// Controls whether iOS UIKit displays a light or dark keyboard palette.
+  /// When null, defaults to [Brightness.dark] in dark mode and [Brightness.light]
+  /// in light mode matching the ambient theme brightness.
+  ///
+  /// Note: This controls the color scheme of the keyboard, not its Liquid Glass
+  /// translucency.
+  final Brightness? keyboardAppearance;
 
   /// The action button on the keyboard.
   final TextInputAction? textInputAction;
@@ -645,6 +657,8 @@ class _GlassTextFieldState extends State<GlassTextField> {
             focusNode: _focusNode,
             obscureText: widget.obscureText,
             keyboardType: widget.keyboardType,
+            keyboardAppearance: widget.keyboardAppearance ??
+                (isDark ? Brightness.dark : Brightness.light),
             textInputAction: widget.textInputAction,
             maxLines: widget.maxLines,
             minLines: widget.minLines,

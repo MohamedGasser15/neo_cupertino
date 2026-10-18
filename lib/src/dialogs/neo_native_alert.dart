@@ -33,6 +33,8 @@ class NeoNativeAlert extends StatefulWidget {
     this.oneTimeCode,
     this.input,
     this.isDark,
+    this.isRtl,
+    this.tint,
   });
 
   final String title;
@@ -44,6 +46,8 @@ class NeoNativeAlert extends StatefulWidget {
   final String? oneTimeCode;
   final NeoAlertDialogInput? input;
   final bool? isDark;
+  final bool? isRtl;
+  final Color? tint;
 
   /// Shows the iOS 26 native alert dialog
   static Future<void> show({
@@ -56,9 +60,22 @@ class NeoNativeAlert extends StatefulWidget {
     Color? iconColor,
     String? oneTimeCode,
     bool? isDark,
+    bool? isRtl,
+    Color? tint,
   }) async {
     final effectiveIsDark =
         isDark ?? (Theme.of(context).brightness == Brightness.dark);
+    final textDirection = Directionality.maybeOf(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final hasArabicText = RegExp(r'[\u0600-\u06FF]').hasMatch(title) ||
+        (message != null && RegExp(r'[\u0600-\u06FF]').hasMatch(message));
+    final effectiveIsRtl = isRtl ??
+        (textDirection == TextDirection.rtl ||
+            locale?.languageCode == 'ar' ||
+            hasArabicText);
+    final effectiveDirection =
+        effectiveIsRtl ? TextDirection.rtl : TextDirection.ltr;
+    final effectiveTint = tint;
 
     // iOS 26+ - Use native iOS 26 alert dialog
     if (PlatformInfo.isIOS26OrHigher()) {
@@ -66,24 +83,33 @@ class NeoNativeAlert extends StatefulWidget {
         context: context,
         barrierColor: CupertinoColors.transparent,
         builder: (dialogContext) {
-          return MediaQuery(
-            data: MediaQuery.of(dialogContext).copyWith(
-              platformBrightness:
-                  effectiveIsDark ? Brightness.dark : Brightness.light,
-            ),
-            child: CupertinoTheme(
-              data: CupertinoThemeData(
-                brightness: effectiveIsDark ? Brightness.dark : Brightness.light,
+          return Directionality(
+            textDirection: effectiveDirection,
+            child: MediaQuery(
+              data: MediaQuery.of(dialogContext).copyWith(
+                platformBrightness:
+                    effectiveIsDark ? Brightness.dark : Brightness.light,
               ),
-              child: NeoNativeAlert(
-                title: title,
-                message: message,
-                actions: actions,
-                iconName: iconName,
-                iconSize: iconSize,
-                iconColor: iconColor,
-                oneTimeCode: oneTimeCode,
-                isDark: effectiveIsDark,
+              child: CupertinoTheme(
+                data: CupertinoThemeData(
+                  brightness: effectiveIsDark ? Brightness.dark : Brightness.light,
+                  primaryColor: effectiveTint ??
+                      (effectiveIsDark
+                          ? CupertinoColors.white
+                          : const Color(0xFF1C1C1E)),
+                ),
+                child: NeoNativeAlert(
+                  title: title,
+                  message: message,
+                  actions: actions,
+                  iconName: iconName,
+                  iconSize: iconSize,
+                  iconColor: iconColor,
+                  oneTimeCode: oneTimeCode,
+                  isDark: effectiveIsDark,
+                  isRtl: effectiveIsRtl,
+                  tint: effectiveTint,
+                ),
               ),
             ),
           );
@@ -92,85 +118,19 @@ class NeoNativeAlert extends StatefulWidget {
       return;
     }
 
-    // iOS 18 and below - Exact CupertinoAlertDialog from adaptive_platform_ui
-    await showCupertinoDialog<void>(
+    // iOS 18 and below (and cross-platform):
+    // Use NeoGlassAlert so users get the exact same Liquid Glass appearance,
+    // translucent backdrop blur, glowing borders, and pill buttons with the accent color.
+    await NeoGlassAlert.show(
       context: context,
-      builder: (dialogContext) {
-        Widget? contentWidget;
-        final hasOtpCode = oneTimeCode != null;
-        final hasScrollableLegacyContent = hasOtpCode || message != null;
-
-        if (hasScrollableLegacyContent) {
-          contentWidget = ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: hasOtpCode ? 60 : 0,
-              maxHeight: 300,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (message != null) ...[
-                    Text(
-                      message,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    if (hasOtpCode) const SizedBox(height: 12),
-                  ],
-                  if (hasOtpCode) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        oneTimeCode,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Courier',
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ],
-              ),
-            ),
-          );
-        }
-
-        return CupertinoAlertDialog(
-          title: Text(title),
-          content: contentWidget != null
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: contentWidget,
-                )
-              : null,
-          actions: actions.map((a) {
-            return CupertinoDialogAction(
-              isDestructiveAction:
-                  a.role == DialogActionRole.destructive,
-              isDefaultAction: a.role == DialogActionRole.primary,
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                a.onPressed();
-              },
-              child: Text(a.title),
-            );
-          }).toList(),
-        );
-      },
+      title: title,
+      message: message,
+      actions: actions,
+      isDark: effectiveIsDark,
+      tint: effectiveTint,
     );
   }
+
 
   /// Shows the iOS 26 native alert dialog with text input
   static Future<String?> inputShow({
@@ -183,9 +143,21 @@ class NeoNativeAlert extends StatefulWidget {
     double? iconSize,
     Color? iconColor,
     bool? isDark,
+    bool? isRtl,
+    Color? tint,
   }) async {
     final effectiveIsDark =
         isDark ?? (Theme.of(context).brightness == Brightness.dark);
+    final textDirection = Directionality.maybeOf(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final hasArabicText = RegExp(r'[\u0600-\u06FF]').hasMatch(title) ||
+        (message != null && RegExp(r'[\u0600-\u06FF]').hasMatch(message));
+    final effectiveIsRtl = isRtl ??
+        (textDirection == TextDirection.rtl ||
+            locale?.languageCode == 'ar' ||
+            hasArabicText);
+    final effectiveDirection =
+        effectiveIsRtl ? TextDirection.rtl : TextDirection.ltr;
 
     // iOS 26+ - Use native iOS 26 alert dialog with input
     if (PlatformInfo.isIOS26OrHigher()) {
@@ -193,24 +165,29 @@ class NeoNativeAlert extends StatefulWidget {
         context: context,
         barrierColor: CupertinoColors.transparent,
         builder: (dialogContext) {
-          return MediaQuery(
-            data: MediaQuery.of(dialogContext).copyWith(
-              platformBrightness:
-                  effectiveIsDark ? Brightness.dark : Brightness.light,
-            ),
-            child: CupertinoTheme(
-              data: CupertinoThemeData(
-                brightness: effectiveIsDark ? Brightness.dark : Brightness.light,
+          return Directionality(
+            textDirection: effectiveDirection,
+            child: MediaQuery(
+              data: MediaQuery.of(dialogContext).copyWith(
+                platformBrightness:
+                    effectiveIsDark ? Brightness.dark : Brightness.light,
               ),
-              child: NeoNativeAlert(
-                title: title,
-                message: message,
-                actions: actions,
-                iconName: iconName,
-                iconSize: iconSize,
-                iconColor: iconColor,
-                input: input,
-                isDark: effectiveIsDark,
+              child: CupertinoTheme(
+                data: CupertinoThemeData(
+                  brightness: effectiveIsDark ? Brightness.dark : Brightness.light,
+                ),
+                child: NeoNativeAlert(
+                  title: title,
+                  message: message,
+                  actions: actions,
+                  iconName: iconName,
+                  iconSize: iconSize,
+                  iconColor: iconColor,
+                  input: input,
+                  isDark: effectiveIsDark,
+                  isRtl: effectiveIsRtl,
+                  tint: tint,
+                ),
               ),
             ),
           );
@@ -222,40 +199,54 @@ class NeoNativeAlert extends StatefulWidget {
     return showCupertinoDialog<String?>(
       context: context,
       builder: (dialogContext) {
-        return CupertinoAlertDialog(
-          title: Text(title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (message != null) Text(message),
-              const SizedBox(height: 12),
-              CupertinoTextField(
-                controller: textController,
-                placeholder: input.placeholder,
-                obscureText: input.obscureText,
-                keyboardType: input.keyboardType,
-                maxLength: input.maxLength,
-                autofocus: true,
-              ),
-            ],
+        return Directionality(
+          textDirection: effectiveDirection,
+          child: CupertinoAlertDialog(
+            title: Text(
+              title,
+              textAlign: TextAlign.center,
+              textDirection: effectiveDirection,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message != null)
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    textDirection: effectiveDirection,
+                  ),
+                const SizedBox(height: 12),
+                CupertinoTextField(
+                  controller: textController,
+                  placeholder: input.placeholder,
+                  textAlign: effectiveIsRtl ? TextAlign.right : TextAlign.left,
+                  textDirection: textDirection,
+                  obscureText: input.obscureText,
+                  keyboardType: input.keyboardType,
+                  maxLength: input.maxLength,
+                  autofocus: true,
+                ),
+              ],
+            ),
+            actions: actions.map((a) {
+              return CupertinoDialogAction(
+                isDestructiveAction:
+                    a.role == DialogActionRole.destructive,
+                isDefaultAction: a.role == DialogActionRole.primary,
+                onPressed: () {
+                  if (a.role == DialogActionRole.cancel) {
+                    Navigator.of(dialogContext).pop<String?>(null);
+                  } else {
+                    final text = textController.text.trim();
+                    Navigator.of(dialogContext).pop<String?>(text.isNotEmpty ? text : null);
+                  }
+                  a.onPressed();
+                },
+                child: Text(a.title, textDirection: textDirection),
+              );
+            }).toList(),
           ),
-          actions: actions.map((a) {
-            return CupertinoDialogAction(
-              isDestructiveAction:
-                  a.role == DialogActionRole.destructive,
-              isDefaultAction: a.role == DialogActionRole.primary,
-              onPressed: () {
-                if (a.role == DialogActionRole.cancel) {
-                  Navigator.of(dialogContext).pop<String?>(null);
-                } else {
-                  final text = textController.text.trim();
-                  Navigator.of(dialogContext).pop<String?>(text.isNotEmpty ? text : null);
-                }
-                a.onPressed();
-              },
-              child: Text(a.title),
-            );
-          }).toList(),
         );
       },
     );
@@ -274,6 +265,18 @@ class _NeoNativeAlertState extends State<NeoNativeAlert> {
   bool get _isDark {
     if (widget.isDark != null) return widget.isDark!;
     return Theme.of(context).brightness == Brightness.dark;
+  }
+
+  bool get _isRtl {
+    if (widget.isRtl != null) return widget.isRtl!;
+    final textDirection = Directionality.maybeOf(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final hasArabicText = RegExp(r'[\u0600-\u06FF]').hasMatch(widget.title) ||
+        (widget.message != null &&
+            RegExp(r'[\u0600-\u06FF]').hasMatch(widget.message!));
+    return textDirection == TextDirection.rtl ||
+        locale?.languageCode == 'ar' ||
+        hasArabicText;
   }
 
   @override
@@ -301,6 +304,10 @@ class _NeoNativeAlertState extends State<NeoNativeAlert> {
   Widget build(BuildContext context) {
     if (!kIsWeb && Platform.isIOS) {
       final isDark = _isDark;
+      final effectiveTint = widget.tint ??
+          (isDark
+              ? const Color(0xFFFFFFFF)
+              : const Color(0xFF1C1C1E));
       final creationParams = <String, dynamic>{
         'title': widget.title,
         if (widget.message != null) 'message': widget.message,
@@ -322,6 +329,8 @@ class _NeoNativeAlertState extends State<NeoNativeAlert> {
           'textFieldKeyboardType': _mapKeyboardType(widget.input!.keyboardType),
         },
         'isDark': isDark,
+        'isRtl': _isRtl,
+        'tint': _colorToARGB(effectiveTint),
       };
 
       final platformView = UiKitView(

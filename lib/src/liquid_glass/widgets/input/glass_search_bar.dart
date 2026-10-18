@@ -1,99 +1,57 @@
 import 'package:flutter/cupertino.dart';
-import '../../theme/glass_theme.dart';
+import 'package:flutter/services.dart';
+
+import '../../../navigation/neo_navigation.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
-
-import '../../types/glass_quality.dart';
-import '../interactive/glass_button.dart';
 import '../../src/utils/glass_localizations.dart';
-import 'glass_text_field.dart';
+import '../../theme/glass_theme.dart';
+import '../../types/glass_quality.dart';
 
-/// A glass morphism search bar following Apple's iOS 26 design patterns.
+/// An authentic Apple Liquid Glass search bar following iOS 26+ design patterns.
 ///
-/// [GlassSearchBar] provides a sophisticated search field with pill shape,
-/// animated clear button, and optional cancel button that slides in from the
-/// right. It matches iOS's UISearchBar appearance and behavior with glass
-/// morphism effects.
+/// [GlassSearchBar] hosts Apple's real glass material ([UIGlassEffect] via
+/// [LiquidGlassContainer]) on iOS 26+, giving genuine optical refraction,
+/// specular rim lighting, and adaptive appearance. On older systems or non-iOS
+/// platforms, it renders the package's frosted glass fallback.
 ///
 /// ## Key Features
 ///
-/// - **Pill-Shaped Glass**: Rounded search field with glass effect
-/// - **Animated Clear Button**: Appears/fades when text is entered
-/// - **Cancel Button**: Optional slide-in cancel button (iOS pattern)
-/// - **Search Icon**: Leading search icon with customizable color
-/// - **Auto-focus Support**: Can auto-focus on appearance
-/// - **Dual Mode**: Grouped or standalone rendering
+/// - **Interactive Expansion Animation**: Renders as a compact, centered pill
+///   when idle. When focused, it smoothly animates and glides to the left, while
+///   the circular glass [×] button pops in on the right.
+/// - **Authentic Liquid Glass**: Capsule surface built with [LiquidGlassContainer].
+/// - **Single-Line Optical Alignment**: Prefix search icon, placeholder text, and
+///   suffix clear button are vertically centered on the exact same axis.
+/// - **Adaptive Styling**: Solid black/white search and cancel icons according
+///   to active brightness.
+/// - **Interactive Clear & Cancel**: Haptic feedback on cancel, with dedicated
+///   callbacks.
 ///
+/// The visual presentation of the cancel button in a [GlassSearchBar].
+enum GlassCancelButtonType {
+  /// A circular Liquid Glass capsule button hosting an icon (defaults to [CupertinoIcons.xmark]).
+  icon,
+
+  /// A Liquid Glass capsule button hosting text (e.g. 'Cancel' or localized 'إلغاء').
+  text,
+
+  /// A completely custom cancel button supplied via [GlassSearchBar.cancelButtonBuilder].
+  custom,
+
+  /// No cancel button is displayed.
+  none,
+}
+
 /// ## Usage
 ///
-/// ### Basic Usage
-/// ```dart
-/// String query = '';
-///
-/// GlassSearchBar(
-///   placeholder: 'Search',
-///   onChanged: (value) {
-///     setState(() => query = value);
-///   },
-/// )
-/// ```
-///
-/// ### With Cancel Button
 /// ```dart
 /// GlassSearchBar(
-///   placeholder: 'Search messages',
-///   showsCancelButton: true,
-///   onCancel: () {
-///     // Clear search and dismiss keyboard
-///   },
-/// )
-/// ```
-///
-/// ### Within LiquidGlassLayer (Grouped Mode)
-/// ```dart
-/// AdaptiveLiquidGlassLayer(
-///   settings: LiquidGlassSettings(
-///     thickness: 30,
-///     blur: 8,
-///     refractiveIndex: 1.59,
-///   ),
-///   child: Column(
-///     children: [
-///       GlassSearchBar(
-///         placeholder: 'Search',
-///         onChanged: (value) => _performSearch(value),
-///       ),
-///       // Search results...
-///     ],
-///   ),
-/// )
-/// ```
-///
-/// ### Standalone Mode
-/// ```dart
-/// GlassSearchBar(
-///   placeholder: 'Search',
-///   useOwnLayer: true,
-///   settings: LiquidGlassSettings(
-///     thickness: 30,
-///     blur: 8,
-///   ),
-///   onChanged: (value) => _performSearch(value),
-/// )
-/// ```
-///
-/// ### Custom Styling
-/// ```dart
-/// GlassSearchBar(
-///   placeholder: 'Search products...',
-///   searchIconColor: Colors.blue,
-///   clearIconColor: Colors.blue,
-///   cancelButtonColor: Colors.blue,
-///   textStyle: TextStyle(fontSize: 18, color: Colors.white),
-///   height: 48,
+///   placeholder: 'Search categories...',
+///   onChanged: (val) => setState(() => query = val),
 /// )
 /// ```
 class GlassSearchBar extends StatefulWidget {
-  /// Creates a glass search bar.
+  /// Creates a Liquid Glass search bar.
   const GlassSearchBar({
     super.key,
     this.controller,
@@ -102,22 +60,36 @@ class GlassSearchBar extends StatefulWidget {
     this.onChanged,
     this.onSubmitted,
     this.onCancel,
-    this.showsCancelButton = false,
+    this.showsCancelButton = true,
+    this.cancelButtonType = GlassCancelButtonType.icon,
+    this.cancelButtonText,
+    this.cancelTextStyle,
+    this.cancelButtonWidth,
+    this.cancelButtonBuilder,
+    this.leading,
+    this.trailing,
+    this.actions,
     this.autofocus = false,
     this.enabled = true,
     this.searchIconColor,
     this.clearIconColor,
     this.cancelButtonColor,
     this.cancelIcon,
-    this.cancelIconSize = 24,
+    this.cancelIconSize = 18.0,
     this.textStyle,
     this.placeholderStyle,
-    this.height = 44.0,
+    this.height = 46.0,
+    this.collapsedWidth = 340.0,
+    this.expandedStartOffset = 8.0,
+    this.animationDuration = const Duration(milliseconds: 320),
+    this.animationCurve = Curves.easeOutCubic,
+    this.style = LiquidGlassStyle.regular,
+    this.shape = const LiquidGlassShape.capsule(),
+    this.clearButtonSemanticLabel,
+    this.cancelButtonSemanticLabel,
     this.settings,
     this.useOwnLayer = false,
     this.quality,
-    this.clearButtonSemanticLabel,
-    this.cancelButtonSemanticLabel,
   });
 
   // ===========================================================================
@@ -126,27 +98,18 @@ class GlassSearchBar extends StatefulWidget {
 
   /// Controls the text being edited.
   ///
-  /// If null, a controller will be created internally.
+  /// If null, a controller will be created and managed internally.
   final TextEditingController? controller;
 
   /// Optional focus node for the search field.
   ///
   /// Providing a [FocusNode] gives you programmatic control over keyboard
-  /// focus independently of [autofocus]:
-  ///
-  /// - `focusNode.requestFocus()` — open keyboard at any moment.
-  /// - `focusNode.unfocus()` — dismiss keyboard without clearing text.
-  /// - `focusNode.addListener(...)` — react to focus changes in your own code.
-  ///
-  /// **Lifecycle:** the caller is responsible for disposing the node.
-  /// The widget will never dispose a caller-provided [FocusNode].
+  /// focus independently of [autofocus].
   ///
   /// If null, an internal node is created and disposed automatically.
   final FocusNode? focusNode;
 
   /// Placeholder text shown when the field is empty.
-  ///
-  /// Defaults to 'Search'.
   final String placeholder;
 
   /// Called when the search text changes.
@@ -156,101 +119,135 @@ class GlassSearchBar extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
 
   /// Called when the cancel button is tapped.
-  ///
-  /// If [showsCancelButton] is true and this callback is provided,
-  /// the cancel button will be shown.
   final VoidCallback? onCancel;
 
-  /// Whether to show the cancel button.
+  /// Whether to show the cancel button when the search bar is focused.
   ///
-  /// When true, the cancel button slides in from the right when the search
-  /// bar is focused, matching iOS behavior.
-  ///
-  /// Defaults to false.
+  /// Defaults to `true`.
   final bool showsCancelButton;
 
-  /// Whether the search field should auto-focus.
+  /// The visual presentation of the cancel button.
   ///
-  /// Defaults to false.
+  /// Defaults to [GlassCancelButtonType.icon].
+  final GlassCancelButtonType cancelButtonType;
+
+  /// Custom text for the cancel button when [cancelButtonType] is [GlassCancelButtonType.text].
+  ///
+  /// If null, defaults to localized cancel text (e.g. 'Cancel' or 'إلغاء').
+  final String? cancelButtonText;
+
+  /// The text style for the cancel button text.
+  final TextStyle? cancelTextStyle;
+
+  /// Custom width allocated for the cancel button.
+  ///
+  /// Defaults to [height] for [GlassCancelButtonType.icon], and `72.0` for
+  /// [GlassCancelButtonType.text].
+  final double? cancelButtonWidth;
+
+  /// Custom builder for the cancel button when [cancelButtonType] is [GlassCancelButtonType.custom].
+  final Widget Function(BuildContext context, VoidCallback onCancel)?
+      cancelButtonBuilder;
+
+  /// Optional custom leading widget replacing the default search icon.
+  final Widget? leading;
+
+  /// Optional trailing widget placed inside the search field after the clear button.
+  final Widget? trailing;
+
+  /// Optional additional action widgets placed inside the search field
+  /// (e.g. voice search/microphone icon, filter button, barcode/QR scanner).
+  final List<Widget>? actions;
+
+  /// Whether the search field should auto-focus.
   final bool autofocus;
 
   /// Whether the search field is enabled.
-  ///
-  /// Defaults to true.
   final bool enabled;
+
+  // ===========================================================================
+  // Animation & Sizing Properties
+  // ===========================================================================
+
+  /// Compact width of the search pill when unfocused.
+  ///
+  /// When non-null, the search bar renders as a compact floating glass pill
+  /// centered when unfocused. When focused, it smoothly expands and glides to the
+  /// left, while the circular glass cancel button animates in on the right.
+  ///
+  /// Set to `null` to disable compact mode and have the search bar always take
+  /// full width. Defaults to `340.0`.
+  final double? collapsedWidth;
+
+  /// Additional logical pixels to extend the search bar toward the start (left in LTR)
+  /// when focused.
+  ///
+  /// Defaults to `8.0`. Set to `0.0` for no start extension.
+  final double expandedStartOffset;
+
+  /// Duration of the focus expansion/collapse animation.
+  ///
+  /// Defaults to `320ms`.
+  final Duration animationDuration;
+
+  /// Curve of the focus expansion/collapse animation.
+  ///
+  /// Defaults to [Curves.easeOutCubic].
+  final Curve animationCurve;
 
   // ===========================================================================
   // Style Properties
   // ===========================================================================
 
-  /// Color of the search icon.
+  /// Color of the leading search icon.
   ///
-  /// Defaults to white with 60% opacity.
+  /// Defaults to solid black in light mode and white in dark mode.
   final Color? searchIconColor;
 
-  /// Color of the clear button icon.
-  ///
-  /// Defaults to white with 60% opacity.
+  /// Color of the inner clear (×) button icon.
   final Color? clearIconColor;
 
-  /// Color of the cancel (×) icon.
-  ///
-  /// Defaults to white with 90% opacity.
+  /// Color of the trailing cancel (×) icon inside the glass button.
   final Color? cancelButtonColor;
 
   /// Custom icon widget for the cancel button.
   ///
-  /// When non-null, replaces the default [CupertinoIcons.xmark] glyph inside
-  /// the glass dismiss pill. The widget is rendered as-is, so it should carry
-  /// its own color and size. When null, [cancelButtonColor] and
-  /// [cancelIconSize] apply to the default × icon.
+  /// Defaults to [CupertinoIcons.xmark].
   final Widget? cancelIcon;
 
-  /// Size of the cancel (×) icon in logical pixels.
-  ///
-  /// Defaults to `24`, matching the visual weight of the search and clear icons.
+  /// Size of the cancel (×) icon in logical pixels. Defaults to `18.0`.
   final double cancelIconSize;
 
   /// Screen reader label of the clear (×) button inside the field.
-  ///
-  /// Defaults to the app's [CupertinoLocalizations.clearButtonLabel].
   final String? clearButtonSemanticLabel;
 
   /// Screen reader label of the cancel button beside the field.
-  ///
-  /// Defaults to the app's [CupertinoLocalizations.cancelButtonLabel].
   final String? cancelButtonSemanticLabel;
 
-  /// The style of the search text.
+  /// The style of the search input text.
   final TextStyle? textStyle;
 
   /// The style of the placeholder text.
   final TextStyle? placeholderStyle;
 
-  /// Height of the search bar.
-  ///
-  /// Defaults to 44 (iOS standard).
+  /// Height of the search bar. Defaults to `46.0`.
   final double height;
 
-  // ===========================================================================
-  // Glass Effect Properties
-  // ===========================================================================
+  /// Glass material variant; see [LiquidGlassStyle].
+  ///
+  /// Defaults to [LiquidGlassStyle.regular].
+  final LiquidGlassStyle style;
 
-  /// Glass effect settings (only used when [useOwnLayer] is true).
+  /// Outline shape of the search surface. Defaults to [LiquidGlassShape.capsule].
+  final LiquidGlassShape shape;
+
+  /// Legacy glass effect settings for custom fallback configuration.
   final LiquidGlassSettings? settings;
 
-  /// Whether to create its own layer or use grouped glass.
-  ///
-  /// Defaults to false (grouped mode).
+  /// Legacy layer flag (kept for backwards compatibility).
   final bool useOwnLayer;
 
-  /// Rendering quality for the glass effect.
-  ///
-  /// Defaults to [GlassQuality.standard], which uses the lightweight fragment
-  /// shader. This works reliably in all contexts, including scrollable lists.
-  ///
-  /// Use [GlassQuality.premium] for full-pipeline shader with texture capture
-  /// and chromatic aberration (Impeller only) in static layouts.
+  /// Legacy quality flag (kept for backwards compatibility).
   final GlassQuality? quality;
 
   @override
@@ -263,7 +260,6 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   bool _ownsController = false;
   bool _ownsFocusNode = false;
   bool _hasText = false;
-  bool _showCancelButton = false;
 
   @override
   void initState() {
@@ -287,6 +283,44 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   }
 
   @override
+  void didUpdateWidget(GlassSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+      if (_ownsController) {
+        _controller.removeListener(_onTextChanged);
+        _controller.dispose();
+      } else {
+        _controller.removeListener(_onTextChanged);
+      }
+      if (widget.controller != null) {
+        _controller = widget.controller!;
+        _ownsController = false;
+      } else {
+        _controller = TextEditingController();
+        _ownsController = true;
+      }
+      _controller.addListener(_onTextChanged);
+      _hasText = _controller.text.isNotEmpty;
+    }
+    if (widget.focusNode != oldWidget.focusNode) {
+      if (_ownsFocusNode) {
+        _focusNode.removeListener(_onFocusChanged);
+        _focusNode.dispose();
+      } else {
+        _focusNode.removeListener(_onFocusChanged);
+      }
+      if (widget.focusNode != null) {
+        _focusNode = widget.focusNode!;
+        _ownsFocusNode = false;
+      } else {
+        _focusNode = FocusNode();
+        _ownsFocusNode = true;
+      }
+      _focusNode.addListener(_onFocusChanged);
+    }
+  }
+
+  @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
@@ -297,28 +331,13 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
 
   void _onTextChanged() {
     final hasText = _controller.text.isNotEmpty;
-    if (hasText != _hasText) setState(() => _hasText = hasText);
+    if (hasText != _hasText) {
+      setState(() => _hasText = hasText);
+    }
   }
 
   void _onFocusChanged() {
-    if (widget.showsCancelButton) {
-      final hasFocus = _focusNode.hasFocus;
-      if (hasFocus != _showCancelButton) {
-        setState(() => _showCancelButton = hasFocus);
-      }
-    }
-  }
-
-  void _handleTapOutside(PointerDownEvent event) {
-    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox != null) {
-      final Offset localPosition = renderBox.globalToLocal(event.position);
-      if (renderBox.paintBounds.contains(localPosition)) {
-        // Tap was inside the search bar row (e.g., on the cancel button), do nothing.
-        return;
-      }
-    }
-    _focusNode.unfocus();
+    if (mounted) setState(() {});
   }
 
   void _handleClear() {
@@ -327,6 +346,7 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
   }
 
   void _handleCancel() {
+    HapticFeedback.lightImpact();
     _controller.clear();
     _focusNode.unfocus();
     widget.onCancel?.call();
@@ -335,104 +355,260 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = GlassTheme.brightnessOf(context) == Brightness.dark;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark ||
+        GlassTheme.brightnessOf(context) == Brightness.dark;
 
     final searchIconColor = widget.searchIconColor ??
-        (isDark ? const Color(0x99FFFFFF) : const Color(0x99000000));
+        (isDark ? CupertinoColors.white : CupertinoColors.black);
     final clearIconColor = widget.clearIconColor ??
-        (isDark ? const Color(0x99FFFFFF) : const Color(0x99000000));
+        (isDark
+            ? CupertinoColors.white.withValues(alpha: 0.65)
+            : const Color(0xFF3C3C43).withValues(alpha: 0.60));
     final cancelButtonColor = widget.cancelButtonColor ??
-        (isDark ? const Color(0xE6FFFFFF) : const Color(0xE6000000));
+        (isDark ? CupertinoColors.white : CupertinoColors.black);
 
-    return Row(
-      children: [
-        // Search field
-        Expanded(
-          child: GlassTextField.search(
-            controller: _controller,
-            focusNode: _focusNode,
-            placeholder: widget.placeholder,
-            prefixIcon: Icon(
-              CupertinoIcons.search,
-              size: 20,
-              color: searchIconColor,
-            ),
-            // AnimatedSwitcher cross-fades and scales the × in/out as the
-            // user types — identical mechanism to _SearchPill for consistency.
-            // No AnimationController needed; the bool setState drives it.
-            suffixIcon: RepaintBoundary(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: ScaleTransition(scale: animation, child: child),
-                ),
-                child: _hasText
-                    ? Icon(
-                        CupertinoIcons.clear_circled_solid,
-                        key: const ValueKey('clear'),
-                        size: 18,
-                        color: clearIconColor,
-                      )
-                    : const SizedBox.shrink(key: ValueKey('empty')),
-              ),
-            ),
-            onSuffixTap: _hasText ? _handleClear : null,
-            suffixSemanticLabel: widget.clearButtonSemanticLabel ??
-                glassCupertinoLocalizationsOf(context).clearButtonLabel,
-            onChanged: widget.onChanged,
-            onSubmitted: widget.onSubmitted,
-            autofocus: widget.autofocus,
-            enabled: widget.enabled,
-            onTapOutside: _handleTapOutside,
-            textStyle: widget.textStyle,
-            placeholderStyle: widget.placeholderStyle,
-            height: widget.height,
-            shape: LiquidRoundedRectangle(
-              borderRadius: widget.height / 2,
-            ),
-            settings: widget.settings,
-            useOwnLayer: widget.useOwnLayer,
-            quality: widget.quality,
-          ),
-        ),
+    final isExpanded = _focusNode.hasFocus || _hasText;
+    final bool hasCancelButton = widget.showsCancelButton &&
+        widget.cancelButtonType != GlassCancelButtonType.none;
+    final bool showCancel = hasCancelButton && isExpanded;
 
-        // Cancel button — text style (iOS Spotlight / Messages pattern).
-        // Note: GlassTabBar.searchable uses a glass ×‑icon button instead;
-        // the two patterns are intentionally different — each matches the iOS
-        // convention for its context (standalone screen vs. bottom bar).
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOutCubic,
-          child: AnimatedOpacity(
-            opacity: _showCancelButton ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 180),
-            child: _showCancelButton
-                ? Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 10),
-                    child: GlassButton(
-                      onTap: _handleCancel,
-                      label: widget.cancelButtonSemanticLabel ??
-                          glassCupertinoLocalizationsOf(context)
-                              .cancelButtonLabel,
-                      width: widget.height,
-                      height: widget.height,
-                      shape: const LiquidOval(),
-                      settings: widget.settings,
-                      useOwnLayer: widget.useOwnLayer,
-                      quality: widget.quality,
-                      icon: widget.cancelIcon ??
-                          Icon(
-                            CupertinoIcons.xmark,
-                            color: cancelButtonColor,
-                            size: widget.cancelIconSize,
-                          ),
+    final double cancelWidth;
+    switch (widget.cancelButtonType) {
+      case GlassCancelButtonType.icon:
+        cancelWidth = widget.cancelButtonWidth ?? widget.height;
+        break;
+      case GlassCancelButtonType.text:
+        cancelWidth = widget.cancelButtonWidth ?? 72.0;
+        break;
+      case GlassCancelButtonType.custom:
+        cancelWidth = widget.cancelButtonWidth ?? widget.height;
+        break;
+      case GlassCancelButtonType.none:
+        cancelWidth = 0.0;
+        break;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final targetCollapsedWidth = widget.collapsedWidth != null
+            ? widget.collapsedWidth!.clamp(140.0, maxWidth)
+            : maxWidth;
+
+        final startExtension = isExpanded ? widget.expandedStartOffset : 0.0;
+
+        final searchWidth = isExpanded
+            ? (hasCancelButton
+                ? maxWidth - cancelWidth - 8.0 + startExtension
+                : maxWidth + startExtension)
+            : targetCollapsedWidth;
+
+        final searchStart = isExpanded
+            ? -startExtension
+            : (maxWidth - targetCollapsedWidth) / 2.0;
+
+        return SizedBox(
+          height: widget.height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Animated Search Bar Pill (slides and expands toward start)
+              AnimatedPositionedDirectional(
+                duration: widget.animationDuration,
+                curve: widget.animationCurve,
+                start: searchStart,
+                top: 0,
+                bottom: 0,
+                width: searchWidth,
+                child: LiquidGlassContainer(
+                  height: widget.height,
+                  style: widget.style,
+                  shape: widget.shape,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: widget.enabled
+                        ? () => _focusNode.requestFocus()
+                        : null,
+                    child: Center(
+                      child: CupertinoTextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: widget.enabled,
+                        autofocus: widget.autofocus,
+                        textInputAction: TextInputAction.search,
+                        textAlignVertical: TextAlignVertical.center,
+                        placeholder: widget.placeholder,
+                        placeholderStyle: widget.placeholderStyle ??
+                            TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w400,
+                              color: isDark
+                                  ? CupertinoColors.white
+                                      .withValues(alpha: 0.55)
+                                  : const Color(0xFF3C3C43)
+                                      .withValues(alpha: 0.55),
+                              letterSpacing: -0.3,
+                            ),
+                        style: widget.textStyle ??
+                            TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w400,
+                              color: isDark
+                                  ? CupertinoColors.white
+                                  : CupertinoColors.black,
+                              letterSpacing: -0.3,
+                            ),
+                        decoration: null,
+                        padding: EdgeInsets.zero,
+                        prefix: widget.leading ??
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 16,
+                                end: 8,
+                              ),
+                              child: Icon(
+                                CupertinoIcons.search,
+                                size: 20,
+                                color: searchIconColor,
+                              ),
+                            ),
+                        suffix: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_hasText)
+                              GestureDetector(
+                                onTap: _handleClear,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                    end: 8,
+                                  ),
+                                  child: Semantics(
+                                    button: true,
+                                    label: widget.clearButtonSemanticLabel ??
+                                        glassCupertinoLocalizationsOf(context)
+                                            .clearButtonLabel,
+                                    child: Icon(
+                                      CupertinoIcons.clear_circled_solid,
+                                      size: 18,
+                                      color: clearIconColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (widget.actions != null) ...widget.actions!,
+                            if (widget.trailing != null) widget.trailing!,
+                            if (!_hasText &&
+                                widget.actions == null &&
+                                widget.trailing == null)
+                              const SizedBox(width: 16)
+                            else
+                              const SizedBox(width: 10),
+                          ],
+                        ),
+                        cursorColor: isDark
+                            ? CupertinoColors.white
+                            : CupertinoColors.activeBlue,
+                        onChanged: (val) {
+                          widget.onChanged?.call(val);
+                        },
+                        onSubmitted: (val) {
+                          _focusNode.unfocus();
+                          widget.onSubmitted?.call(val);
+                        },
+                      ),
                     ),
-                  )
-                : const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+
+              // Animated Glass Cancel Button (slides/scales in at end)
+              if (hasCancelButton)
+                AnimatedPositionedDirectional(
+                  duration: widget.animationDuration,
+                  curve: widget.animationCurve,
+                  end: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: cancelWidth,
+                  child: AnimatedScale(
+                    scale: showCancel ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutBack,
+                    child: AnimatedOpacity(
+                      opacity: showCancel ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: IgnorePointer(
+                        ignoring: !showCancel,
+                        child: widget.cancelButtonBuilder != null
+                            ? widget.cancelButtonBuilder!(
+                                context,
+                                _handleCancel,
+                              )
+                            : LiquidGlassContainer(
+                                width: cancelWidth,
+                                height: widget.height,
+                                style: widget.style,
+                                shape: const LiquidGlassShape.capsule(),
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _handleCancel,
+                                  child: Center(
+                                    child: Semantics(
+                                      button: true,
+                                      label: widget.cancelButtonSemanticLabel ??
+                                          glassCupertinoLocalizationsOf(context)
+                                              .cancelButtonLabel,
+                                      child: _buildCancelContent(
+                                        context,
+                                        cancelButtonColor,
+                                        isDark,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  Widget _buildCancelContent(
+    BuildContext context,
+    Color cancelButtonColor,
+    bool isDark,
+  ) {
+    if (widget.cancelButtonType == GlassCancelButtonType.text) {
+      final text = widget.cancelButtonText ??
+          glassCupertinoLocalizationsOf(context).cancelButtonLabel;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: widget.cancelTextStyle ??
+              TextStyle(
+                fontSize: 15.0,
+                fontWeight: FontWeight.w600,
+                color: widget.cancelButtonColor ??
+                    (isDark ? CupertinoColors.white : CupertinoColors.activeBlue),
+                letterSpacing: -0.2,
+              ),
+        ),
+      );
+    }
+
+    return widget.cancelIcon ??
+        Icon(
+          CupertinoIcons.xmark,
+          size: widget.cancelIconSize,
+          color: cancelButtonColor,
+        );
   }
 }

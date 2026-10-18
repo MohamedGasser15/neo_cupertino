@@ -12,6 +12,9 @@ export 'src/calendar/cupertino_calendar_picker.dart';
 
 // 3. Liquid Glass Design System
 export 'src/liquid_glass/liquid_glass.dart';
+export 'src/liquid_glass/widgets/feedback/glass_content_unavailable_view.dart';
+export 'src/liquid_glass/widgets/overlays/glass_modal_sheet.dart'
+    show showGlassModalSheet;
 
 // 4. iOS Navigation & Bottom Bar
 export 'src/navigation/neo_navigation.dart';
@@ -61,10 +64,20 @@ typedef NeoScaffold = GlassScaffold;
 
 // Overlays & Sheets
 typedef NeoModalSheet = GlassModalSheet;
+const showNeoModalSheet = showGlassModalSheet;
 typedef NeoDialog = GlassDialog;
 
+// Feedback & Empty States
+typedef NeoContentUnavailableView = GlassContentUnavailableView;
+
+// Inputs & Search
+typedef NeoSearchBar = GlassSearchBar;
+
 // Context Menus
+typedef NeoMenu = GlassMenu;
+typedef NeoMenuItem = GlassMenuItem;
 typedef NeoSingleTapContextMenu = IosSingleTapContextMenu;
+typedef NeoNativeMenu = IosSingleTapContextMenu;
 typedef NeoHoldContextMenu = IosHoldContextMenu;
 typedef NeoContextMenuItem = IosContextMenuItem;
 typedef NeoContextMenuAction = IosContextMenuAction;

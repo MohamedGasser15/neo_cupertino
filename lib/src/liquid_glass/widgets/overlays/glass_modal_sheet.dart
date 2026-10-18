@@ -471,6 +471,7 @@ class GlassModalSheet extends StatefulWidget {
 
     final effectiveController = controller ?? GlassModalSheetController();
     bool isClosing = false;
+    bool isClosingFromSheetHidden = false;
 
     // Resolved once, before the route is pushed: the trigger's rect has to be
     // read while the trigger is still laid out, and the render capabilities
@@ -489,7 +490,7 @@ class GlassModalSheet extends StatefulWidget {
     // is the window the closing morph plays in.
     final transitionDuration = morphing
         ? _morphRouteDuration(morphSpeed)
-        : const Duration(milliseconds: 500);
+        : const Duration(milliseconds: 320);
 
     return showGeneralDialog<T>(
       context: context,
@@ -511,10 +512,22 @@ class GlassModalSheet extends StatefulWidget {
         // linear route animation would flatten the J-curve and the underdamped
         // catch, so the page passes straight through.
         if (morphing) return child;
+
+        // When the sheet was swiped to dismiss, `_snapToState(GlassSheetState.hidden)`
+        // already runs its own physical SpringSimulation (seeding the user's release
+        // velocity) to smoothly slide the sheet off-screen to 0.0.
+        // Applying SlideTransition on top would double-translate the sheet,
+        // causing it to fall at 2x speed and snap abruptly.
+        if (isClosingFromSheetHidden) return child;
+
         return SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
               .animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutQuart),
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: const Cubic(0.32, 0.0, 0.24, 1.0),
+            ),
           ),
           child: child,
         );
@@ -575,6 +588,7 @@ class GlassModalSheet extends StatefulWidget {
             onStateChanged?.call(state);
             if (state == GlassSheetState.hidden && !isClosing) {
               isClosing = true;
+              isClosingFromSheetHidden = true;
               Navigator.of(context).pop();
             }
           },
@@ -736,6 +750,116 @@ class GlassModalSheet extends StatefulWidget {
     }
   }
 
+  /// Convenient, opinionated helper to present a [GlassModalSheet]
+  /// with optimal defaults matching iOS 18/26 Liquid Glass sheets.
+  static Future<T?> present<T>({
+    required BuildContext context,
+    required WidgetBuilder builder,
+    double halfSize = 0.68,
+    double fullSize = 0.88,
+    GlassSheetState initialState = GlassSheetState.half,
+    bool showDragIndicator = true,
+    GlassModalSheetController? controller,
+    ValueChanged<GlassSheetState>? onStateChanged,
+    LiquidGlassSettings? settings,
+    Color? barrierColor,
+    bool useRootNavigator = true,
+    bool platformViewBackdrop = true,
+    GlassMorphAnchor? morphFrom,
+    Rect? morphFromRect,
+  }) =>
+      showGlassModalSheet<T>(
+        context: context,
+        builder: builder,
+        halfSize: halfSize,
+        fullSize: fullSize,
+        initialState: initialState,
+        showDragIndicator: showDragIndicator,
+        controller: controller,
+        onStateChanged: onStateChanged,
+        settings: settings,
+        barrierColor: barrierColor,
+        useRootNavigator: useRootNavigator,
+        platformViewBackdrop: platformViewBackdrop,
+        morphFrom: morphFrom,
+        morphFromRect: morphFromRect,
+      );
+
   @override
   State<GlassModalSheet> createState() => _GlassModalSheetState();
 }
+
+/// Convenient, opinionated top-level helper to present a [GlassModalSheet]
+/// with optimal defaults matching iOS 18/26 Liquid Glass sheets.
+///
+/// Automatically resolves theme settings (dark/light), detents, spring
+/// physics, and modal dismiss behavior without requiring verbose boilerplate.
+Future<T?> showGlassModalSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  double halfSize = 0.68,
+  double fullSize = 0.88,
+  GlassSheetState initialState = GlassSheetState.half,
+  bool showDragIndicator = true,
+  GlassModalSheetController? controller,
+  ValueChanged<GlassSheetState>? onStateChanged,
+  LiquidGlassSettings? settings,
+  Color? barrierColor,
+  bool useRootNavigator = true,
+  bool platformViewBackdrop = true,
+  GlassMorphAnchor? morphFrom,
+  Rect? morphFromRect,
+}) {
+  final isDark = (CupertinoTheme.maybeBrightnessOf(context) ??
+          MediaQuery.maybePlatformBrightnessOf(context) ??
+          Brightness.light) ==
+      Brightness.dark;
+  final glassSettings = settings ??
+      (isDark
+          ? const LiquidGlassSettings(
+              thickness: 20,
+              blur: 28,
+              glassColor: Color(0x661E1E26),
+              refractiveIndex: 1.18,
+              lightIntensity: 0.90,
+              whitenStrength: 0.08,
+            )
+          : const LiquidGlassSettings(
+              thickness: 18,
+              blur: 24,
+              glassColor: Color(0xCCFFFFFF),
+              refractiveIndex: 1.12,
+              whitenStrength: 0.15,
+            ));
+
+  return GlassModalSheet.show<T>(
+    context: context,
+    useRootNavigator: useRootNavigator,
+    platformViewBackdrop: platformViewBackdrop,
+    controller: controller,
+    initialState: initialState,
+    halfSize: halfSize,
+    fullSize: fullSize,
+    detents: const {GlassSheetDetent.medium, GlassSheetDetent.large},
+    horizontalMargin: 5.0,
+    bottomMargin: 6.0,
+    topBorderRadius: 38.0,
+    bottomBorderRadius: 38.0,
+    fullTopBorderRadius: 24.0,
+    fullBottomBorderRadius: 0.0,
+    showDragIndicator: showDragIndicator,
+    dragIndicatorColor: isDark
+        ? const Color(0x55FFFFFF)
+        : const Color(0x33000000),
+    barrierColor: barrierColor ??
+        (isDark ? const Color(0x80000000) : const Color(0x33000000)),
+    settings: glassSettings,
+    halfSettings: glassSettings,
+    fullSettings: glassSettings,
+    onStateChanged: onStateChanged,
+    morphFrom: morphFrom,
+    morphFromRect: morphFromRect,
+    builder: builder,
+  );
+}
+

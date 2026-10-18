@@ -14,6 +14,8 @@ class IosHoldContextMenu extends StatefulWidget {
   final ValueChanged<String>? onSelected;
   final VoidCallback? onTap;
   final BorderRadius? borderRadius;
+  final Brightness? brightness;
+  final bool? isDark;
 
   const IosHoldContextMenu({
     super.key,
@@ -22,6 +24,8 @@ class IosHoldContextMenu extends StatefulWidget {
     this.onSelected,
     this.onTap,
     this.borderRadius,
+    this.brightness,
+    this.isDark,
   });
 
   @override
@@ -92,6 +96,24 @@ class _IosHoldContextMenuState extends State<IosHoldContextMenu> {
     }
   }
 
+  bool _resolveIsDark(BuildContext context) {
+    if (widget.isDark != null) {
+      return widget.isDark!;
+    }
+    if (widget.brightness != null) {
+      return widget.brightness == Brightness.dark;
+    }
+    final cupertinoBrightness = CupertinoTheme.maybeBrightnessOf(context);
+    if (cupertinoBrightness != null) {
+      return cupertinoBrightness == Brightness.dark;
+    }
+    try {
+      return Theme.of(context).brightness == Brightness.dark;
+    } catch (_) {
+      return MediaQuery.maybePlatformBrightnessOf(context) == Brightness.dark;
+    }
+  }
+
   Future<void> _showIosMenu() async {
     final now = DateTime.now();
     // Guard against rapid triggering, repeated taps, or reopening right after dismissal
@@ -108,6 +130,9 @@ class _IosHoldContextMenuState extends State<IosHoldContextMenu> {
 
     _lastOpenTime = now;
     _isMenuOpen = true;
+
+    final isDark = _resolveIsDark(context);
+    final isRtl = Directionality.maybeOf(context) == TextDirection.rtl;
 
     final double screenHeight =
         MediaQuery.maybeOf(context)?.size.height ?? 800.0;
@@ -128,6 +153,8 @@ class _IosHoldContextMenuState extends State<IosHoldContextMenu> {
     params['y'] = targetY;
     params['width'] = anchorRect.width;
     params['height'] = 1.0;
+    params['isDark'] = isDark;
+    params['isRtl'] = isRtl;
 
     await _iosHostChannel.invokeMethod<void>('showMenu', params);
   }
@@ -218,33 +245,39 @@ class _IosHoldContextMenuState extends State<IosHoldContextMenu> {
     _lastOpenTime = now;
     _isMenuOpen = true;
 
+    final isDark = _resolveIsDark(context);
     final selectedId = await showCupertinoModalPopup<String>(
       context: context,
       builder: (ctx) {
-        return CupertinoActionSheet(
-          actions: [
-            for (final item in widget.actions)
-              if (item is IosContextMenuAction)
-                CupertinoActionSheetAction(
-                  onPressed: () => Navigator.of(ctx).pop(item.id),
-                  isDestructiveAction: item.destructive,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (item.showTrailingCheckmark) ...[
-                        const Icon(CupertinoIcons.checkmark, size: 18),
-                        const SizedBox(width: 8),
+        return CupertinoTheme(
+          data: CupertinoTheme.of(ctx).copyWith(
+            brightness: isDark ? Brightness.dark : Brightness.light,
+          ),
+          child: CupertinoActionSheet(
+            actions: [
+              for (final item in widget.actions)
+                if (item is IosContextMenuAction)
+                  CupertinoActionSheetAction(
+                    onPressed: () => Navigator.of(ctx).pop(item.id),
+                    isDestructiveAction: item.destructive,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (item.showTrailingCheckmark) ...[
+                          const Icon(CupertinoIcons.checkmark, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(item.title),
                       ],
-                      Text(item.title),
-                    ],
+                    ),
                   ),
-                ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            isDefaultAction: true,
-            child: Text(
-              CupertinoLocalizations.of(ctx).cancelButtonLabel,
+            ],
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              isDefaultAction: true,
+              child: Text(
+                CupertinoLocalizations.of(ctx).cancelButtonLabel,
+              ),
             ),
           ),
         );

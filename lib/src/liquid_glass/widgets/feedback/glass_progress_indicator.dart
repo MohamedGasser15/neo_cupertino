@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
 
 import '../../theme/glass_theme_data.dart';
 import '../../types/glass_quality.dart';
+import '../containers/glass_container.dart';
+import '../interactive/glass_button.dart';
 import '../shared/neo_liquid_glass_layer.dart';
 
 /// A glass morphism progress indicator following Apple's iOS 26 Liquid Glass
@@ -544,4 +547,190 @@ class _LinearProgressPainter extends CustomPainter {
 enum _ProgressIndicatorType {
   circular,
   linear,
+}
+
+/// A glass-aesthetic empty state and search-unavailable view following Apple's
+/// iOS `ContentUnavailableView` design patterns.
+class GlassContentUnavailableView extends StatelessWidget {
+  /// The icon displayed inside the glass emblem.
+  final IconData icon;
+
+  /// Primary bold title.
+  final String title;
+
+  /// Optional explanatory subtitle text.
+  final String? message;
+
+  /// Optional action button label.
+  final String? actionLabel;
+
+  /// Called when the action button is tapped.
+  final VoidCallback? onAction;
+
+  /// Custom action widget (overrides [actionLabel] and [onAction]).
+  final Widget? action;
+
+  /// Liquid glass settings for the icon emblem.
+  final LiquidGlassSettings? settings;
+
+  /// Internal padding.
+  final EdgeInsetsGeometry padding;
+
+  /// Creates a standard [GlassContentUnavailableView].
+  const GlassContentUnavailableView({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+    this.action,
+    this.settings,
+    this.padding = const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+  });
+
+  /// Creates an iOS-style search unavailable view matching `ContentUnavailableView.search`.
+  factory GlassContentUnavailableView.search({
+    Key? key,
+    required String query,
+    VoidCallback? onClear,
+    String? title,
+    String? message,
+    String? clearButtonLabel,
+    LiquidGlassSettings? settings,
+    EdgeInsetsGeometry padding =
+        const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+  }) {
+    return GlassContentUnavailableView(
+      key: key,
+      icon: CupertinoIcons.search,
+      title: title ?? (query.trim().isEmpty ? 'No Results' : 'No Results for "$query"'),
+      message: message ??
+          'Check the spelling or try a new search.',
+      actionLabel: onClear != null ? (clearButtonLabel ?? 'Clear Search') : null,
+      onAction: onClear,
+      settings: settings,
+      padding: padding,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? Colors.white : const Color(0xFF09090B);
+    final secondaryTextColor =
+        isDark ? const Color(0xFFA1A1AA) : const Color(0xFF71717A);
+
+    final glassSettings = settings ??
+        (isDark
+            ? const LiquidGlassSettings(
+                thickness: 16,
+                blur: 16,
+                glassColor: Color(0x33FFFFFF),
+                refractiveIndex: 1.15,
+              )
+            : const LiquidGlassSettings(
+                thickness: 14,
+                blur: 14,
+                glassColor: Color(0x66FFFFFF),
+                refractiveIndex: 1.12,
+              ));
+
+    return Padding(
+      padding: padding,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Liquid Glass Icon Emblem
+            GlassContainer(
+              useOwnLayer: true,
+              width: 76,
+              height: 76,
+              shape: const LiquidRoundedRectangle(borderRadius: 24),
+              settings: glassSettings,
+              child: Center(
+                child: Icon(
+                  icon,
+                  size: 34,
+                  color: isDark
+                      ? const Color(0xFFE4E4E7)
+                      : const Color(0xFF3F3F46),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+                color: primaryTextColor,
+              ),
+            ),
+
+            // Subtitle / Message
+            if (message != null && message!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  fontWeight: FontWeight.w400,
+                  color: secondaryTextColor,
+                ),
+              ),
+            ],
+
+            // Action Button
+            if (action != null) ...[
+              const SizedBox(height: 22),
+              action!,
+            ] else if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 22),
+              GlassButton.custom(
+                useOwnLayer: true,
+                onTap: onAction!,
+                shape: const LiquidRoundedRectangle(borderRadius: 18),
+                height: 38,
+                settings: isDark
+                    ? const LiquidGlassSettings(
+                        thickness: 12,
+                        blur: 12,
+                        glassColor: Color(0x33FFFFFF),
+                      )
+                    : const LiquidGlassSettings(
+                        thickness: 12,
+                        blur: 12,
+                        glassColor: Color(0x88FFFFFF),
+                      ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Center(
+                    child: Text(
+                      actionLabel!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFFE4E4E7)
+                            : const Color(0xFF18181B),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -44,7 +44,7 @@ class DialogAction {
     DialogActionRole? role,
     DialogActionRole? style,
     this.enabled = true,
-  }) : role = role ?? style ?? DialogActionRole.primary;
+  }) : role = role ?? style ?? DialogActionRole.cancel;
 
   final String title;
   final VoidCallback onPressed;
@@ -76,6 +76,7 @@ class NeoGlassAlert extends StatelessWidget {
     required this.actions,
     this.maxWidth = 320,
     this.isDark,
+    this.tint,
   });
 
   final String title;
@@ -84,6 +85,7 @@ class NeoGlassAlert extends StatelessWidget {
   final List<DialogAction> actions;
   final double maxWidth;
   final bool? isDark;
+  final Color? tint;
 
   /// Shows the Neo-Cupertino iOS 26 glass alert dialog
   static Future<T?> show<T>({
@@ -95,10 +97,13 @@ class NeoGlassAlert extends StatelessWidget {
     bool barrierDismissible = false,
     double maxWidth = 320,
     bool? isDark,
+    Color? tint,
   }) {
     HapticFeedback.lightImpact();
 
     final isDarkMode = isDark ?? (Theme.of(context).brightness == Brightness.dark);
+
+    final textDirection = Directionality.of(context);
 
     return showGeneralDialog<T>(
       context: context,
@@ -107,14 +112,18 @@ class NeoGlassAlert extends StatelessWidget {
       barrierColor: Colors.black.withValues(alpha: 0.35),
       transitionDuration: const Duration(milliseconds: 260),
       pageBuilder: (dialogContext, anim1, anim2) {
-        return Center(
-          child: NeoGlassAlert(
-            title: title,
-            message: message,
-            icon: icon,
-            actions: actions,
-            maxWidth: maxWidth,
-            isDark: isDarkMode,
+        return Directionality(
+          textDirection: textDirection,
+          child: Center(
+            child: NeoGlassAlert(
+              title: title,
+              message: message,
+              icon: icon,
+              actions: actions,
+              maxWidth: maxWidth,
+              isDark: isDarkMode,
+              tint: tint,
+            ),
           ),
         );
       },
@@ -208,12 +217,15 @@ class NeoGlassAlert extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 26, 24, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (icon != null) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: icon!,
+                      Align(
+                        alignment: isRTL ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: icon!,
+                        ),
                       ),
                     ],
 
@@ -221,6 +233,7 @@ class NeoGlassAlert extends StatelessWidget {
                     Text(
                       title,
                       textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                      textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
                       style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w600,
@@ -235,6 +248,7 @@ class NeoGlassAlert extends StatelessWidget {
                       Text(
                         message!,
                         textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                        textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w400,
@@ -264,7 +278,9 @@ class NeoGlassAlert extends StatelessWidget {
 
     // 2 actions: Horizontal layout side-by-side
     if (actions.length == 2) {
+      final isRTL = Directionality.of(context) == TextDirection.rtl;
       return Row(
+        textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
         children: [
           Expanded(
             child: _buildPillButton(context, actions[0], isDark),
@@ -312,16 +328,15 @@ class NeoGlassAlert extends StatelessWidget {
           ? const Color(0xFFE5E5EA)
           : const Color(0xFF1C1C1E);
     } else {
-      // Standard neutral pill as in the screenshot:
-      // Light Mode: #D4D4DC
-      // Dark Mode: #38383B / #3A3A3C
+      // Exactly matches the logout alert button:
+      // Light Mode: #E5E5EA with 0.85 opacity (clean iOS systemFill / systemGray5 pill)
+      // Dark Mode: #2C2C2E with 0.90 opacity (sleek dark neutral pill)
       buttonBgColor = isDark
-          ? const Color(0xFF38383B).withValues(alpha: 0.92)
-          : const Color(0xFFD4D4DC).withValues(alpha: 0.88);
+          ? const Color(0xFF2C2C2E).withValues(alpha: 0.90)
+          : const Color(0xFFE5E5EA).withValues(alpha: 0.85);
 
-      textColor = isDark
-          ? const Color(0xFFFFFFFF)
-          : const Color(0xFF111111);
+      textColor = tint ??
+          (isDark ? const Color(0xFFE5E5EA) : const Color(0xFF1C1C1E));
     }
 
     return CupertinoButton(

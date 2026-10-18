@@ -39,6 +39,8 @@ class IosContextMenuSubmenu extends IosContextMenuItem {
     required this.children,
     this.iconSystemName,
     this.iconAssetPath,
+    this.icon,
+    this.iconWidget,
   });
 
   /// Label shown for this submenu.
@@ -49,6 +51,12 @@ class IosContextMenuSubmenu extends IosContextMenuItem {
 
   /// Asset path for an icon image.
   final String? iconAssetPath;
+
+  /// Optional Flutter [IconData] used on Android and fallback platforms.
+  final IconData? icon;
+
+  /// Optional custom icon widget.
+  final Widget? iconWidget;
 
   /// Child items shown when the submenu opens.
   final List<IosContextMenuItem> children;
@@ -62,6 +70,8 @@ class IosContextMenuSubmenu extends IosContextMenuItem {
         other.title == title &&
         other.iconSystemName == iconSystemName &&
         other.iconAssetPath == iconAssetPath &&
+        other.icon == icon &&
+        other.iconWidget == iconWidget &&
         listEquals(other.children, children);
   }
 
@@ -70,6 +80,8 @@ class IosContextMenuSubmenu extends IosContextMenuItem {
         title,
         iconSystemName,
         iconAssetPath,
+        icon,
+        iconWidget,
         Object.hashAll(children),
       );
 }
@@ -83,6 +95,8 @@ class IosContextMenuAction extends IosContextMenuItem {
     required this.title,
     this.iconSystemName,
     this.iconAssetPath,
+    this.icon,
+    this.iconWidget,
     this.showTrailingCheckmark = false,
     this.destructive = false,
     this.enabled = true,
@@ -99,6 +113,12 @@ class IosContextMenuAction extends IosContextMenuItem {
 
   /// Asset path for an icon image.
   final String? iconAssetPath;
+
+  /// Optional Flutter [IconData] used on Android and fallback platforms.
+  final IconData? icon;
+
+  /// Optional custom icon widget.
+  final Widget? iconWidget;
 
   /// Whether to show a trailing checkmark.
   final bool showTrailingCheckmark;
@@ -119,6 +139,8 @@ class IosContextMenuAction extends IosContextMenuItem {
         other.title == title &&
         other.iconSystemName == iconSystemName &&
         other.iconAssetPath == iconAssetPath &&
+        other.icon == icon &&
+        other.iconWidget == iconWidget &&
         other.showTrailingCheckmark == showTrailingCheckmark &&
         other.destructive == destructive &&
         other.enabled == enabled;
@@ -130,6 +152,8 @@ class IosContextMenuAction extends IosContextMenuItem {
         title,
         iconSystemName,
         iconAssetPath,
+        icon,
+        iconWidget,
         showTrailingCheckmark,
         destructive,
         enabled,
@@ -147,6 +171,8 @@ class IosSingleTapContextMenu extends StatefulWidget {
     required this.child,
     required this.actions,
     this.onSelected,
+    this.brightness,
+    this.isDark,
   });
 
   /// Child widget that triggers the menu.
@@ -157,6 +183,12 @@ class IosSingleTapContextMenu extends StatefulWidget {
 
   /// Callback invoked with selected [IosContextMenuAction.id].
   final ValueChanged<String>? onSelected;
+
+  /// Explicit brightness override. If null, resolves from [isDark] or nearest [Theme]/[CupertinoTheme].
+  final Brightness? brightness;
+
+  /// Explicit dark mode flag override. If null, resolves from [brightness] or nearest [Theme]/[CupertinoTheme].
+  final bool? isDark;
 
   @override
   State<IosSingleTapContextMenu> createState() =>
@@ -233,6 +265,24 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
     );
   }
 
+  bool _resolveIsDark(BuildContext context) {
+    if (widget.isDark != null) {
+      return widget.isDark!;
+    }
+    if (widget.brightness != null) {
+      return widget.brightness == Brightness.dark;
+    }
+    final cupertinoBrightness = CupertinoTheme.maybeBrightnessOf(context);
+    if (cupertinoBrightness != null) {
+      return cupertinoBrightness == Brightness.dark;
+    }
+    try {
+      return Theme.of(context).brightness == Brightness.dark;
+    } catch (_) {
+      return MediaQuery.maybePlatformBrightnessOf(context) == Brightness.dark;
+    }
+  }
+
   Future<void> _showCupertinoMenu() async {
     final now = DateTime.now();
     if (_isMenuOpen ||
@@ -243,48 +293,61 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
     _lastOpenTime = now;
     _isMenuOpen = true;
 
+    final isDark = _resolveIsDark(context);
     final selectedId = await showCupertinoModalPopup<String>(
       context: context,
       builder: (ctx) {
-        return CupertinoActionSheet(
-          actions: [
-            for (final item in widget.actions)
-              if (item is IosContextMenuAction)
-                CupertinoActionSheetAction(
-                  onPressed: () => Navigator.of(ctx).pop(item.id),
-                  isDestructiveAction: item.destructive,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (item.showTrailingCheckmark) ...[
-                        const Icon(CupertinoIcons.checkmark, size: 18),
-                        const SizedBox(width: 8),
+        return CupertinoTheme(
+          data: CupertinoTheme.of(ctx).copyWith(
+            brightness: isDark ? Brightness.dark : Brightness.light,
+          ),
+          child: CupertinoActionSheet(
+            actions: [
+              for (final item in widget.actions)
+                if (item is IosContextMenuAction)
+                  CupertinoActionSheetAction(
+                    onPressed: () => Navigator.of(ctx).pop(item.id),
+                    isDestructiveAction: item.destructive,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (item.showTrailingCheckmark) ...[
+                          const Icon(CupertinoIcons.checkmark, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        if (item.iconWidget != null) ...[
+                          item.iconWidget!,
+                          const SizedBox(width: 8),
+                        ] else if (item.icon != null) ...[
+                          Icon(item.icon, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(item.title),
                       ],
-                      Text(item.title),
-                    ],
+                    ),
+                  )
+                else if (item is IosContextMenuSubmenu)
+                  CupertinoActionSheetAction(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showCupertinoSubmenu(item);
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(item.title),
+                        const SizedBox(width: 6),
+                        const Icon(CupertinoIcons.chevron_forward, size: 16),
+                      ],
+                    ),
                   ),
-                )
-              else if (item is IosContextMenuSubmenu)
-                CupertinoActionSheetAction(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _showCupertinoSubmenu(item);
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(item.title),
-                      const SizedBox(width: 6),
-                      const Icon(CupertinoIcons.chevron_forward, size: 16),
-                    ],
-                  ),
-                ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            isDefaultAction: true,
-            child: Text(
-              CupertinoLocalizations.of(ctx).cancelButtonLabel,
+            ],
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              isDefaultAction: true,
+              child: Text(
+                CupertinoLocalizations.of(ctx).cancelButtonLabel,
+              ),
             ),
           ),
         );
@@ -301,34 +364,47 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
   }
 
   Future<void> _showCupertinoSubmenu(IosContextMenuSubmenu submenu) async {
+    final isDark = _resolveIsDark(context);
     final selectedId = await showCupertinoModalPopup<String>(
       context: context,
       builder: (ctx) {
-        return CupertinoActionSheet(
-          title: Text(submenu.title),
-          actions: [
-            for (final item in submenu.children)
-              if (item is IosContextMenuAction)
-                CupertinoActionSheetAction(
-                  onPressed: () => Navigator.of(ctx).pop(item.id),
-                  isDestructiveAction: item.destructive,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (item.showTrailingCheckmark) ...[
-                        const Icon(CupertinoIcons.checkmark, size: 18),
-                        const SizedBox(width: 8),
+        return CupertinoTheme(
+          data: CupertinoTheme.of(ctx).copyWith(
+            brightness: isDark ? Brightness.dark : Brightness.light,
+          ),
+          child: CupertinoActionSheet(
+            title: Text(submenu.title),
+            actions: [
+              for (final item in submenu.children)
+                if (item is IosContextMenuAction)
+                  CupertinoActionSheetAction(
+                    onPressed: () => Navigator.of(ctx).pop(item.id),
+                    isDestructiveAction: item.destructive,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (item.showTrailingCheckmark) ...[
+                          const Icon(CupertinoIcons.checkmark, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        if (item.iconWidget != null) ...[
+                          item.iconWidget!,
+                          const SizedBox(width: 8),
+                        ] else if (item.icon != null) ...[
+                          Icon(item.icon, size: 18),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(item.title),
                       ],
-                      Text(item.title),
-                    ],
+                    ),
                   ),
-                ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            isDefaultAction: true,
-            child: Text(
-              CupertinoLocalizations.of(ctx).cancelButtonLabel,
+            ],
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              isDefaultAction: true,
+              child: Text(
+                CupertinoLocalizations.of(ctx).cancelButtonLabel,
+              ),
             ),
           ),
         );
@@ -368,6 +444,9 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
     _lastOpenTime = now;
     _isMenuOpen = true;
 
+    final isDark = _resolveIsDark(context);
+    final isRtl = Directionality.maybeOf(context) == TextDirection.rtl;
+
     final Rect anchorRect =
         renderObject.localToGlobal(Offset.zero) & renderObject.size;
     final params = await _buildCreationParams();
@@ -376,6 +455,8 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
     params['y'] = anchorRect.top;
     params['width'] = anchorRect.width;
     params['height'] = anchorRect.height;
+    params['isDark'] = isDark;
+    params['isRtl'] = isRtl;
 
     await _iosHostChannel.invokeMethod<void>('showMenu', params);
   }
@@ -389,8 +470,6 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
   }
 
   Future<void> _showAndroidMenu(TapDownDetails details) async {
-    _assertAndroidIcons(widget.actions);
-
     final selectedId = await _showAndroidMenuForItems(
       context: context,
       position: details.globalPosition,
@@ -460,6 +539,20 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
       }
 
       if (item is IosContextMenuAction) {
+        Widget? iconWidget;
+        if (item.iconWidget != null) {
+          iconWidget = item.iconWidget;
+        } else if (item.icon != null) {
+          iconWidget = Icon(
+            item.icon,
+            size: 20,
+            color: item.destructive ? Colors.red : null,
+          );
+        } else if (item.iconAssetPath != null &&
+            item.iconAssetPath!.isNotEmpty) {
+          iconWidget = _buildAndroidMenuIcon(item.iconAssetPath);
+        }
+
         entries.add(
           PopupMenuItem<_AndroidMenuResult>(
             enabled: item.enabled,
@@ -468,8 +561,10 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
               constraints: const BoxConstraints(minWidth: _androidMenuMinWidth),
               child: Row(
                 children: [
-                  _buildAndroidMenuIcon(item.iconAssetPath),
-                  const SizedBox(width: 12),
+                  if (iconWidget != null) ...[
+                    iconWidget,
+                    const SizedBox(width: 12),
+                  ],
                   Expanded(
                     child: Text(
                       item.title,
@@ -478,6 +573,10 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
                           : null,
                     ),
                   ),
+                  if (item.showTrailingCheckmark) ...[
+                    const SizedBox(width: 8),
+                    const Icon(CupertinoIcons.checkmark, size: 16),
+                  ],
                 ],
               ),
             ),
@@ -507,33 +606,23 @@ class _IosSingleTapContextMenuState extends State<IosSingleTapContextMenu> {
 
   Widget _buildAndroidMenuIcon(String? assetPath) {
     final safeAsset = assetPath ?? '';
-    return SvgPicture.asset(
+    if (safeAsset.isEmpty) {
+      return const SizedBox(width: 20, height: 20);
+    }
+    if (safeAsset.endsWith('.svg')) {
+      return SvgPicture.asset(
+        safeAsset,
+        width: 20,
+        height: 20,
+      );
+    }
+    return Image.asset(
       safeAsset,
       width: 20,
       height: 20,
     );
   }
 
-  void _assertAndroidIcons(List<IosContextMenuItem> items) {
-    for (final item in items) {
-      if (item is IosContextMenuAction) {
-        if (item.iconAssetPath == null || item.iconAssetPath!.isEmpty) {
-          throw FlutterError(
-            'Android context menu requires iconAssetPath for every action. '
-            'Missing for action id: ${item.id}',
-          );
-        }
-      } else if (item is IosContextMenuSubmenu) {
-        if (item.iconAssetPath == null || item.iconAssetPath!.isEmpty) {
-          throw FlutterError(
-            'Android context menu requires iconAssetPath for every submenu. '
-            'Missing for submenu title: ${item.title}',
-          );
-        }
-        _assertAndroidIcons(item.children);
-      }
-    }
-  }
 
   Future<Map<String, Object?>> _buildCreationParams() async {
     final serialized = <Map<String, Object?>>[];

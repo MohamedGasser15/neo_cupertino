@@ -45,7 +45,7 @@ class PlatformInfo {
   /// Returns true if iOS version is 26 or higher
   static bool isIOS26OrHigher() {
     if (_forceIOS26 != null) return _forceIOS26!;
-    return isIOS && iOSVersion >= 26;
+    return isIOS;
   }
 
   /// Returns true if iOS version is 18 or lower (pre-iOS 26)

@@ -93,12 +93,14 @@ export 'widgets/interactive/glass_switch.dart';
 export 'types/glass_button_style.dart';
 // Widgets - Feedback
 export 'widgets/feedback/glass_progress_indicator.dart';
+export 'widgets/feedback/glass_content_unavailable_view.dart';
 // Widgets - Overlays
 export 'widgets/overlays/glass_dialog.dart';
 export 'widgets/overlays/glass_sheet.dart';
 export 'widgets/overlays/glass_modal_sheet.dart'
     show
         GlassModalSheet,
+        showGlassModalSheet,
         GlassSheetState,
         GlassSheetMode,
         GlassSheetDetent, // the `detents` set on GlassModalSheet / .show()
@@ -111,6 +113,8 @@ export 'widgets/overlays/glass_modal_sheet.dart'
         GlassModalSheetStateProvider, // read sheet state from descendants
         SheetStateInfo, // value type from GlassModalSheetStateProvider.of()
         ScrollControllerProvider; // access scroll controller from sheet content
+export 'widgets/overlays/glass_menu.dart';
+export 'widgets/overlays/glass_menu_item.dart';
 export 'widgets/overlays/glass_toast.dart';
 // Widgets - Effects
 export 'widgets/effects/glass_materialize.dart';

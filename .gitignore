@@ -31,3 +31,7 @@ migrate_working_dir/
 
 # Symbol processing related
 undecorated_symbol_map.json
+
+# Xcode
+xcuserdata/
+*.xcuserstate
