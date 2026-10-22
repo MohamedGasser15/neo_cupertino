@@ -283,15 +283,24 @@ class GlassThemeVariant {
   /// [GlassThemeVariant] to override all widgets globally.
   static const GlassThemeVariant light = GlassThemeVariant(
     settings: GlassThemeSettings(
-      thickness: 12.0, // Slightly thicker than dark — needs more body on white
-      blur: 5.0, // Matched with dark for consistency
-      glassColor: Color.fromRGBO(210, 220, 240, 0.12), // ~12% cool blue-white
-      lightAngle: 2.356, // 0.75 * pi ≈ 135° — upper-left, matches iOS 26
-      lightIntensity: 0.85, // Softer — bright backgrounds need less highlight
-      ambientStrength: 0.15, // Touch of ambient keeps glass visible on white
-      refractiveIndex: 1.2,
-      saturation: 1.2,
-      chromaticAberration: 0.02, // Subtle prismatic edge, not distracting
+      thickness: 32.0,
+      blur: 0.6,
+      blurWeight: 0.8,
+      frost: 14.0,
+      frostOpacity: 0.73,
+      frostClamp: 0.4,
+      frostWeight: 2.0,
+      glassColor: Color(0x87F8F8F8), // Authentic iOS 26/27 light liquid glass tint
+      lightAngle: 1.5707963267948966, // pi / 2: lit from the top
+      lightIntensity: 0.6,
+      ambientStrength: 0.15,
+      refractiveIndex: 1.24,
+      saturation: 2.1,
+      chromaticAberration: 0.01,
+      edgeAbsorption: 0.035,
+      rimShade: 1.0,
+      rimLight: 1.0,
+      lensModel: GlassLensModel.paraxial,
     ),
     quality: null,
     glowColors: GlassGlowColors.fallback,
@@ -305,15 +314,26 @@ class GlassThemeVariant {
   /// [GlassThemeVariant] to override all widgets globally.
   static const GlassThemeVariant dark = GlassThemeVariant(
     settings: GlassThemeSettings(
-      thickness: 10.0,
-      blur: 4.0,
-      glassColor: Color.fromRGBO(255, 255, 255, 0.08),
-      lightAngle: 2.356, // 0.75 * pi ≈ 135° — upper-left, matches iOS 26
-      lightIntensity: 0.7,
+      thickness: 32.0,
+      blur: 0.6,
+      blurWeight: 2.5,
+      frost: 14.0,
+      frostOpacity: 0.85,
+      frostClamp: -0.45,
+      frostWeight: 0.5,
+      glassColor: Color(0x1FFFFFFF),
+      lightAngle: -1.5707963267948966, // -pi / 2: lit from the bottom
+      lightIntensity: 0.6,
       ambientStrength: 0.0,
-      refractiveIndex: 1.2,
-      saturation: 1.2,
+      refractiveIndex: 1.24,
+      saturation: 1.4,
       chromaticAberration: 0.01,
+      edgeAbsorption: 0.035,
+      rimShade: 1.0,
+      rimShadeEnds: 0.0,
+      rimLight: 1.15,
+      bodyShade: 0.28,
+      lensModel: GlassLensModel.paraxial,
     ),
     quality: null,
     glowColors: GlassGlowColors.fallback,
