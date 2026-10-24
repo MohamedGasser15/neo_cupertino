@@ -343,9 +343,8 @@ void main() {
   //
   // smoothstep(0.3, 0.5, luma) creates a sharp binary-like transition:
   //   dark  (luma=0.15) → smoothstep=0.0 → rimFade=1.0  (FULL rim, untouched)
-  //   light (luma=0.85) → smoothstep=1.0 → rimFade=0.08 (near-invisible rim)
-  // Dark mode is completely unaffected.
-  float rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92;
+  //   light (luma=0.85) → smoothstep=1.0 → rimFade=0.55 (balanced translucent rim)
+  float rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.45;
   float rimAlphaBase = kRimAlphaBase * rimFade + 0.15 * directionalInfluence * uLightIntensity;
   rimAlphaBase *= uRefractiveIndex;
   rimAlphaBase += totalSpecular * kRimAlphaSpecular * rimFade;
@@ -483,9 +482,10 @@ void main() {
     float isLight = step(0.5, uBackdropLuma);
     float isClear = step(0.5, uBodyMode);
     
-    // 8% frost floor ensures minimum material visibility in adaptive mode.
+    // Simulated frost floor ensures natural liquid glass material visibility in adaptive mode.
+    // In light mode, frost provides body presence against light backgrounds.
     // In clear mode, simulated frost floor is zeroed out for exact color reproduction.
-    float simulatedFrost = mix(0.08 + densityFactor * 0.05 + isLight * 0.04, 0.0, isClear);
+    float simulatedFrost = mix(0.10 + densityFactor * 0.05 + isLight * 0.16, 0.0, isClear);
     float pmA = mix(max(glassAlpha, simulatedFrost), glassAlpha, isClear);
     
     // In light mode, transparent glass becomes white frost. In dark mode, it remains black (ambient darken).

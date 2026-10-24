@@ -722,7 +722,10 @@ class _GlassButtonState extends State<GlassButton>
         ? LiquidStretch.nativePressGrowth
         : math.max(widget.width ?? 480, widget.height ?? 480) *
             (interactionScale - 1.0);
-    return (growth / 2 + 8).ceilToDouble();
+    // When stretch is enabled, provide ample headroom so dragging/stretching
+    // does not hit the texture bounds and produce a straight-edge clipping line.
+    final stretchMargin = widget.stretch > 0 ? 48.0 : 0.0;
+    return (growth / 2 + 8 + stretchMargin).ceilToDouble();
   }
 
   @override

@@ -138,9 +138,6 @@ class _LiquidGlassBottomBarState extends State<LiquidGlassBottomBar> {
   }
 
   void _select(int index) {
-    if (index != widget.currentIndex) {
-      HapticFeedback.selectionClick();
-    }
     widget.onTap(index);
   }
 
