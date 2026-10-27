@@ -39,6 +39,8 @@ class NeoTextField extends StatelessWidget {
     this.padding,
     this.decoration,
     this.cupertinoDecoration,
+    this.keyboardAppearance,
+    this.cursorColor,
   });
 
   final TextEditingController? controller;
@@ -68,6 +70,8 @@ class NeoTextField extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final InputDecoration? decoration;
   final BoxDecoration? cupertinoDecoration;
+  final Brightness? keyboardAppearance;
+  final Color? cursorColor;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +79,8 @@ class NeoTextField extends StatelessWidget {
   }
 
   Widget _buildCupertinoTextField(BuildContext context) {
-    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark ||
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 
     final defaultDecoration = BoxDecoration(
       color: enabled
@@ -91,11 +96,15 @@ class NeoTextField extends StatelessWidget {
     return CupertinoTextField(
       controller: controller,
       focusNode: focusNode,
+      cursorColor: cursorColor ?? (isDark ? Colors.white : Colors.black),
+      cursorWidth: 2.0,
+      cursorRadius: const Radius.circular(2.0),
+      keyboardAppearance: keyboardAppearance ?? (isDark ? Brightness.dark : Brightness.light),
       placeholder: placeholder,
       placeholderStyle: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w400,
-        color: isDark ? const Color(0xFF636366) : const Color(0xFF8E8E93),
+        color: isDark ? const Color(0xFFA1A1AA) : const Color(0xFF8E8E93),
       ),
       keyboardType: keyboardType,
       textInputAction: textInputAction,
