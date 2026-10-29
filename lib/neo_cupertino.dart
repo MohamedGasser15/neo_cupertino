@@ -36,6 +36,22 @@ export 'src/input/neo_text_form_field.dart';
 export 'src/widgets/neo_list_tile.dart';
 export 'src/widgets/neo_keyboard_floating_button.dart';
 
+// 8. Neo-Cupertino Unified Theming
+export 'src/theme/neo_theme.dart';
+export 'src/theme/neo_theme_data.dart';
+
+// 9. iOS 26 Liquid Pull to Refresh
+export 'src/refresh/neo_pull_to_refresh.dart';
+
+// 10. iOS 26 Liquid Glass Wheel Picker
+export 'src/picker/neo_wheel_picker.dart';
+
+// 11. iOS 26 Liquid Glass Action Sheet
+export 'src/overlays/neo_action_sheet.dart';
+
+// 12. iOS 26 Liquid Glass Tooltip & Popover
+export 'src/overlays/neo_tooltip.dart';
+
 import 'src/calendar/cupertino_calendar_picker.dart';
 import 'src/context_menu/neo_single_tap_context_menu.dart';
 import 'src/liquid_glass/liquid_glass.dart';
@@ -53,6 +69,7 @@ typedef NeoButton = GlassButton;
 typedef NeoIconButton = GlassIconButton;
 typedef NeoChip = GlassChip;
 typedef NeoBadge = GlassBadge;
+typedef NeoPageControl = GlassPageControl;
 
 // Containers & Surfaces
 typedef NeoCard = GlassCard;
@@ -61,17 +78,31 @@ typedef NeoDivider = GlassDivider;
 typedef NeoStepper = GlassStepper;
 typedef NeoAppBar = GlassAppBar;
 typedef NeoScaffold = GlassScaffold;
+typedef NeoTabBar = GlassTabBar;
+typedef NeoToolbar = GlassToolbar;
+typedef NeoPinnedBarChrome = GlassPinnedBarChrome;
+typedef NeoGroupedSection = GlassGroupedSection;
+typedef NeoGlassListTile = GlassListTile;
+typedef NeoPage = GlassPage;
+typedef NeoStatusBarStyle = GlassStatusBarStyle;
 
 // Overlays & Sheets
 typedef NeoModalSheet = GlassModalSheet;
 const showNeoModalSheet = showGlassModalSheet;
+typedef NeoSheet = GlassSheet;
 typedef NeoDialog = GlassDialog;
+typedef NeoToast = GlassToast;
 
 // Feedback & Empty States
 typedef NeoContentUnavailableView = GlassContentUnavailableView;
+typedef NeoProgressIndicator = GlassProgressIndicator;
 
 // Inputs & Search
 typedef NeoSearchBar = GlassSearchBar;
+typedef NeoGlassTextField = GlassTextField;
+typedef NeoPasswordField = GlassPasswordField;
+typedef NeoTextArea = GlassTextArea;
+typedef NeoPicker = GlassPicker;
 
 // Context Menus
 typedef NeoMenu = GlassMenu;
