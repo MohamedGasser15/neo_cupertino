@@ -11,6 +11,7 @@ class CalendarWeekdays extends StatelessWidget {
     assert(debugCheckHasCupertinoLocalizations(context));
     assert(debugCheckHasMaterialLocalizations(context));
 
+    final bool isAr = Localizations.localeOf(context).languageCode == 'ar';
     final DateTime nowDate = DateTime.now();
     final int year = nowDate.year;
     final int month = nowDate.month;
@@ -26,10 +27,24 @@ class CalendarWeekdays extends StatelessWidget {
     );
     return List<Widget>.generate(DateTime.daysPerWeek, (int index) {
       final DateTime date = firstDayOfWeekDate.addDays(index);
-      final String mediumDateString = localization.datePickerMediumDate(date);
-      final String weekday = mediumDateString.substring(0, 3);
+      String weekday;
+      if (isAr) {
+        const arWeekdays = {
+          DateTime.saturday: 'سبت',
+          DateTime.sunday: 'أحد',
+          DateTime.monday: 'إثنين',
+          DateTime.tuesday: 'ثلاثاء',
+          DateTime.wednesday: 'أربعاء',
+          DateTime.thursday: 'خميس',
+          DateTime.friday: 'جمعة',
+        };
+        weekday = arWeekdays[date.weekday] ?? '';
+      } else {
+        final String mediumDateString = localization.datePickerMediumDate(date);
+        weekday = mediumDateString.substring(0, 3).toUpperCase();
+      }
       return CalendarWeekday(
-        weekday: weekday.toUpperCase(),
+        weekday: weekday,
         decoration: decoration,
       );
     });

@@ -41,6 +41,7 @@ class _CalendarHeaderState extends State<CalendarHeader> {
   Widget build(BuildContext context) {
     assert(debugCheckHasCupertinoLocalizations(context));
 
+    final bool isRtl = Directionality.of(context) == TextDirection.rtl;
     final CupertinoLocalizations localization =
         CupertinoLocalizations.of(context);
     final DateTime date = widget.currentMonth;
@@ -74,12 +75,14 @@ class _CalendarHeaderState extends State<CalendarHeader> {
                 AnimatedRotation(
                   duration: calendarHeaderFadeDuration,
                   curve: Curves.easeInOut,
-                  turns: _showYearPicker ? 1.25 : 1.0,
+                  turns: _showYearPicker ? (isRtl ? -0.25 : 0.25) : 0.0,
                   child: SizedBox(
                     width: 11.0,
                     height: 22.0,
                     child: Icon(
-                      CupertinoIcons.chevron_forward,
+                      isRtl
+                          ? CupertinoIcons.chevron_back
+                          : CupertinoIcons.chevron_forward,
                       color: _decoration.monthDateArrowColor,
                       size: calendarMonthPickerIconSize,
                     ),
@@ -102,7 +105,9 @@ class _CalendarHeaderState extends State<CalendarHeader> {
                   height: calendarMonthSwitcherSize,
                   width: calendarMonthSwitcherSize,
                   child: Icon(
-                    CupertinoIcons.chevron_back,
+                    isRtl
+                        ? CupertinoIcons.chevron_forward
+                        : CupertinoIcons.chevron_back,
                     color: _isBackwardDisabled
                         ? _decoration.backwardDisabledButtonColor
                         : _decoration.backwardButtonColor,
@@ -118,7 +123,9 @@ class _CalendarHeaderState extends State<CalendarHeader> {
                   height: calendarMonthSwitcherSize,
                   width: calendarMonthSwitcherSize,
                   child: Icon(
-                    CupertinoIcons.chevron_forward,
+                    isRtl
+                        ? CupertinoIcons.chevron_back
+                        : CupertinoIcons.chevron_forward,
                     color: _isForwardDisabled
                         ? _decoration.forwardDisabledButtonColor
                         : _decoration.forwardButtonColor,
