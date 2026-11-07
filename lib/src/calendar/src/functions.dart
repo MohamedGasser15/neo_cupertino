@@ -140,64 +140,60 @@ Future<DateTime?> _showCupertino18DatePicker({
         CupertinoColors.separator,
         ctx,
       );
+      final bool isRtl = Directionality.of(context) == TextDirection.rtl;
 
-      return Container(
-        height: 280,
-        color: backgroundColor,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: separatorColor, width: 0.5),
+      return Directionality(
+        textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+        child: Container(
+          height: 280,
+          color: backgroundColor,
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: separatorColor, width: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(
+                        isRtl ? 'إلغاء' : CupertinoLocalizations.of(ctx).cancelButtonLabel,
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        onDateSelected?.call(selectedDate);
+                        Navigator.of(ctx).pop(selectedDate);
+                      },
+                      child: Text(
+                        isRtl ? 'تم' : 'Done',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(
-                      CupertinoLocalizations.of(ctx).cancelButtonLabel,
-                    ),
-                  ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      onDateSelected?.call(selectedDate);
-                      Navigator.of(ctx).pop(selectedDate);
-                    },
-                    child: Builder(
-                      builder: (bCtx) {
-                        String label = 'Done';
-                        try {
-                          label = MaterialLocalizations.of(bCtx).okButtonLabel;
-                        } catch (_) {}
-                        return Text(
-                          label,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: selectedDate,
+                  minimumDate: minimumDate,
+                  maximumDate: maximumDate,
+                  onDateTimeChanged: (DateTime newDate) {
+                    selectedDate = newDate;
+                    onDateChanged?.call(newDate);
+                  },
+                ),
               ),
-            ),
-            Expanded(
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.date,
-                initialDateTime: selectedDate,
-                minimumDate: minimumDate,
-                maximumDate: maximumDate,
-                onDateTimeChanged: (DateTime newDate) {
-                  selectedDate = newDate;
-                  onDateChanged?.call(newDate);
-                },
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },

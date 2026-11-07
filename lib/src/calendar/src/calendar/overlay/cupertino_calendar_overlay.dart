@@ -153,6 +153,8 @@ class _CupertinoCalendarOverlayState extends State<CupertinoCalendarOverlay> {
       top = widgetBottomCenterY + offset.dy;
     }
 
+    final bool isRtl = Directionality.of(context) == TextDirection.rtl;
+
     if (fitsHorizontally) {
       left = widgetCenterX - calendarHalfWidth;
     } else if (fitsOnLeft) {
@@ -160,11 +162,14 @@ class _CupertinoCalendarOverlayState extends State<CupertinoCalendarOverlay> {
     } else if (fitsOnRight) {
       left = horizontalSpacing;
     } else {
-      left = 0;
-      right = 0;
+      left = horizontalSpacing;
     }
 
     left += offset.dx;
+    final maxLeft = screenWidth - calendarWidth - horizontalSpacing;
+    if (maxLeft >= horizontalSpacing) {
+      left = left.clamp(horizontalSpacing, maxLeft);
+    }
 
     final double verticalSpace = fitsOnTop ? spaceOnTop : spaceOnBottom;
     final double horizontalSpace = fitsOnLeft ? spaceOnLeft : spaceOnRight;
@@ -237,22 +242,25 @@ class _CupertinoCalendarOverlayState extends State<CupertinoCalendarOverlay> {
             bottom: bottom,
             child: Material(
               color: Colors.transparent,
-              child: CupertinoCalendar(
-                onInitialized: _onInitialized,
-                weekdayDecoration: widget.weekdayDecoration,
-                monthPickerDecoration: widget.monthPickerDecoration,
-                containerDecoration: widget.containerDecoration,
-                headerDecoration: widget.headerDecoration,
-                minimumDate: widget.minimumDate,
-                initialDate: widget.initialDate,
-                currentDate: widget.currentDate,
-                maximumDate: widget.maximumDate,
-                onDateChanged: _onDateChanged,
-                onDateSelected: _onDateSelected,
-                onDisplayedMonthChanged: widget.onDisplayedMonthChanged,
-                scaleAlignment: scaleAligment,
-                maxScale: maxScale,
-                mainColor: widget.mainColor,
+              child: Directionality(
+                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                child: CupertinoCalendar(
+                  onInitialized: _onInitialized,
+                  weekdayDecoration: widget.weekdayDecoration,
+                  monthPickerDecoration: widget.monthPickerDecoration,
+                  containerDecoration: widget.containerDecoration,
+                  headerDecoration: widget.headerDecoration,
+                  minimumDate: widget.minimumDate,
+                  initialDate: widget.initialDate,
+                  currentDate: widget.currentDate,
+                  maximumDate: widget.maximumDate,
+                  onDateChanged: _onDateChanged,
+                  onDateSelected: _onDateSelected,
+                  onDisplayedMonthChanged: widget.onDisplayedMonthChanged,
+                  scaleAlignment: scaleAligment,
+                  maxScale: maxScale,
+                  mainColor: widget.mainColor,
+                ),
               ),
             ),
           ),
