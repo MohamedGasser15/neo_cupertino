@@ -227,6 +227,9 @@ class GlassModalSheet extends StatefulWidget {
   /// Whether to show the iOS-style drag handle at the top. Default: true.
   final bool showDragIndicator;
 
+  /// Whether pointer drags can resize or dismiss the sheet. Default: true.
+  final bool enableDrag;
+
   /// Custom color for the drag handle.
   final Color? dragIndicatorColor;
 
@@ -292,6 +295,7 @@ class GlassModalSheet extends StatefulWidget {
     this.peekSize = 90.0,
     this.fillTransition = GlassFillTransition.instant,
     this.showDragIndicator = true,
+    this.enableDrag = true,
     this.dragIndicatorColor,
     this.dragIndicatorWidth = 36,
     this.dragIndicatorHeight = 4,
@@ -391,6 +395,7 @@ class GlassModalSheet extends StatefulWidget {
     bool platformViewBackdrop = false,
     Color barrierColor = GlassDefaults.barrierColor,
     bool isDismissible = true,
+    bool enableDrag = true,
     bool useRootNavigator = false,
     double interactionScale = 1.01,
     bool enableInteractionGlow = true,
@@ -578,6 +583,7 @@ class GlassModalSheet extends StatefulWidget {
           fullStateContentSettings: fullStateContentSettings,
           detents: detents,
           dismissible: dismissible,
+          enableDrag: enableDrag,
           peekHorizontalMargin: peekHorizontalMargin,
           peekBottomMargin: peekBottomMargin,
           peekWidth: peekWidth,
@@ -801,8 +807,15 @@ Future<T?> showGlassModalSheet<T>({
   double fullSize = 0.88,
   GlassSheetState initialState = GlassSheetState.half,
   bool showDragIndicator = true,
+  bool enableDrag = true,
   GlassModalSheetController? controller,
   ValueChanged<GlassSheetState>? onStateChanged,
+  double interactionScale = 1.01,
+  double stretch = 0.5,
+  bool enableInteractionGlow = true,
+  bool enableSaturationGlow = true,
+  double bottomMargin = 6.0,
+  double bottomBorderRadius = 38.0,
   LiquidGlassSettings? settings,
   Color? barrierColor,
   bool useRootNavigator = true,
@@ -840,11 +853,16 @@ Future<T?> showGlassModalSheet<T>({
     initialState: initialState,
     halfSize: halfSize,
     fullSize: fullSize,
+    enableDrag: enableDrag,
+    interactionScale: interactionScale,
+    stretch: stretch,
+    enableInteractionGlow: enableInteractionGlow,
+    enableSaturationGlow: enableSaturationGlow,
+    bottomMargin: bottomMargin,
+    bottomBorderRadius: bottomBorderRadius,
     detents: const {GlassSheetDetent.medium, GlassSheetDetent.large},
     horizontalMargin: 5.0,
-    bottomMargin: 6.0,
     topBorderRadius: 38.0,
-    bottomBorderRadius: 38.0,
     fullTopBorderRadius: 24.0,
     fullBottomBorderRadius: 0.0,
     showDragIndicator: showDragIndicator,

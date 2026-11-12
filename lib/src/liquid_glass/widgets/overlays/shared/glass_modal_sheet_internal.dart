@@ -859,6 +859,9 @@ class GlassModalSheetScaffold extends StatelessWidget {
   /// rubber-bands at its lowest detent instead. Forwarded to the sheet.
   final bool dismissible;
 
+  /// Whether dragging the sheet changes its detent. Defaults to true.
+  final bool enableDrag;
+
   /// Horizontal padding specifically for the 'peek' state.
   final double? peekHorizontalMargin;
 
@@ -929,6 +932,7 @@ class GlassModalSheetScaffold extends StatelessWidget {
     this.fullStateContentSettings,
     this.detents = const {GlassSheetDetent.medium, GlassSheetDetent.large},
     this.dismissible = true,
+    this.enableDrag = true,
     this.peekHorizontalMargin,
     this.peekBottomMargin,
     this.peekWidth,
@@ -1009,6 +1013,7 @@ class GlassModalSheetScaffold extends StatelessWidget {
           fullStateContentSettings: fullStateContentSettings,
           detents: detents,
           dismissible: dismissible,
+          enableDrag: enableDrag,
           peekHorizontalMargin: peekHorizontalMargin,
           peekBottomMargin: peekBottomMargin,
           peekWidth: peekWidth,

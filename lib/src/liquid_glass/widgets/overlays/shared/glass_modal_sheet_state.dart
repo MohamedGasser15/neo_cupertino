@@ -324,6 +324,7 @@ class _GlassModalSheetState extends State<GlassModalSheet>
   // ════════════════════════════════════════════════════════════════════════
 
   bool _onScrollNotification(ScrollNotification notification) {
+    if (!widget.enableDrag) return false;
     // Vertical only. Scroll notifications bubble from ANY descendant, so a
     // horizontal list inside the sheet — a date strip, a carousel — emits
     // exactly this shape when it is pulled past its leading edge. Without the
@@ -355,6 +356,7 @@ class _GlassModalSheetState extends State<GlassModalSheet>
   // ════════════════════════════════════════════════════════════════════════
 
   void _onPointerDown(PointerDownEvent event) {
+    if (!widget.enableDrag) return;
     // ALWAYS initialize the gesture arena so swipes can start from anywhere,
     // even from buttons or interactive children.
     _gestureArena.beginPointer(
@@ -426,6 +428,7 @@ class _GlassModalSheetState extends State<GlassModalSheet>
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (!widget.enableDrag) return;
     if (_isInteractingWithChild) {
       return;
     }
@@ -485,6 +488,7 @@ class _GlassModalSheetState extends State<GlassModalSheet>
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (!widget.enableDrag) return;
     _isInteractingWithChild = false;
     _suppressScalingForSession = false;
     _saturationController.reverse();
@@ -515,6 +519,7 @@ class _GlassModalSheetState extends State<GlassModalSheet>
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
+    if (!widget.enableDrag) return;
     _isInteractingWithChild = false;
     _suppressScalingForSession = false;
     _saturationController.reverse();

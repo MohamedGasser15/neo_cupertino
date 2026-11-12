@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
+import 'package:flutter/services.dart';
+import '../../../navigation/src/capabilities.dart' as native_glass;
 import '../../constants/glass_defaults.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
 
@@ -169,6 +172,7 @@ class GlassButton extends StatefulWidget {
     this.canRequestFocus = true,
     this.excludeFromSemantics = false,
     this.isStationary = false,
+    this.useSystemGlassStyle = false,
   }) : child = null;
 
   /// Creates a glass button with custom content.
@@ -231,9 +235,10 @@ class GlassButton extends StatefulWidget {
     this.canRequestFocus = true,
     this.excludeFromSemantics = false,
     this.isStationary = false,
-  })  : icon = null,
-        iconSize = 24.0,
-        iconColor = null;
+    this.useSystemGlassStyle = false,
+  }) : icon = null,
+       iconSize = 24.0,
+       iconColor = null;
 
   // ===========================================================================
   // Content Properties
@@ -577,6 +582,10 @@ class GlassButton extends StatefulWidget {
   /// Defaults to `false` — existing behaviour is preserved.
   final bool isStationary;
 
+  /// Uses Apple's native `UIButton.Configuration.glass()` on iOS 26+.
+  /// Older iOS versions and other platforms keep the Flutter-rendered button.
+  final bool useSystemGlassStyle;
+
   // ===========================================================================
   // Focus / Keyboard Properties
   // ===========================================================================
@@ -615,6 +624,7 @@ class GlassButton extends StatefulWidget {
 
 class _GlassButtonState extends State<GlassButton>
     with SingleTickerProviderStateMixin {
+  MethodChannel? _nativeSystemButtonChannel;
   late final AnimationController _saturationController;
   late final CurvedAnimation _saturationAnimation;
   final ValueNotifier<bool> _isHovered = ValueNotifier(false);
@@ -701,17 +711,107 @@ class _GlassButtonState extends State<GlassButton>
 
   void _handlePointerDown(PointerDownEvent event) {
     if (!mounted || !widget.enabled) return;
+    _nativeSystemButtonChannel?.invokeMethod<void>('pressed', true);
     _saturationController.forward();
   }
 
   void _handlePointerUp(PointerUpEvent event) {
     if (!mounted || !widget.enabled) return;
+    _nativeSystemButtonChannel?.invokeMethod<void>('pressed', false);
     _saturationController.reverse();
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
     if (!mounted || !widget.enabled) return;
+    _nativeSystemButtonChannel?.invokeMethod<void>('pressed', false);
     _saturationController.reverse();
+  }
+
+  Widget _buildSystemGlassButton(BuildContext context) {
+    final isDark = GlassTheme.brightnessOf(context) == Brightness.dark;
+    final content = SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Align(
+        alignment: widget.alignment,
+        child:
+            widget.child ??
+            IconTheme(
+              data: IconThemeData(
+                color: widget.iconColor ?? CupertinoColors.white,
+                size: widget.iconSize,
+              ),
+              child: widget.icon ?? const SizedBox.shrink(),
+            ),
+      ),
+    );
+    final layered = SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: widget.alignment,
+        children: [
+          _NativeSystemGlassButtonSurface(
+            prominent: widget.style == GlassButtonStyle.prominent,
+            capsule: widget.shape is LiquidOval,
+            enabled: widget.enabled,
+            isDark: isDark,
+            onCreated: (channel) => _nativeSystemButtonChannel = channel,
+          ),
+          IgnorePointer(child: content),
+        ],
+      ),
+    );
+    final focusable = GlassFocusRegion(
+      enabled: widget.enabled,
+      focusNode: widget.focusNode,
+      canRequestFocus: widget.canRequestFocus,
+      autofocus: widget.autofocus,
+      semanticLabel: (!widget.excludeFromSemantics && widget.label.isNotEmpty)
+          ? widget.label
+          : null,
+      isButton: !widget.excludeFromSemantics,
+      semanticOnTap: (!widget.excludeFromSemantics && widget.enabled)
+          ? widget.onTap
+          : null,
+      shape: widget.shape,
+      isFocusedNotifier: _isFocused,
+      isHoveredNotifier: _isHovered,
+      onKeyboardActivate: _activateFromKeyboard,
+      child: widget.enabled ? layered : Opacity(opacity: 0.5, child: layered),
+    );
+
+    if (widget.persistPressOnDrag) {
+      return Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerUp,
+        onPointerCancel: _handlePointerCancel,
+        behavior: HitTestBehavior.opaque,
+        child: GestureDetector(
+          onTap: widget.enabled ? widget.onTap : null,
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          child: focusable,
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: widget.enabled ? widget.onTap : null,
+      onTapDown: widget.enabled
+          ? (_) =>
+                _nativeSystemButtonChannel?.invokeMethod<void>('pressed', true)
+          : null,
+      onTapUp: widget.enabled
+          ? (_) =>
+                _nativeSystemButtonChannel?.invokeMethod<void>('pressed', false)
+          : null,
+      onTapCancel: () =>
+          _nativeSystemButtonChannel?.invokeMethod<void>('pressed', false),
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      child: focusable,
+    );
   }
 
   /// Texture headroom for the press inflation: half the growth of the longest
@@ -721,7 +821,7 @@ class _GlassButtonState extends State<GlassButton>
     final growth = interactionScale == null
         ? LiquidStretch.nativePressGrowth
         : math.max(widget.width ?? 480, widget.height ?? 480) *
-            (interactionScale - 1.0);
+              (interactionScale - 1.0);
     // When stretch is enabled, provide ample headroom so dragging/stretching
     // does not hit the texture bounds and produce a straight-edge clipping line.
     final stretchMargin = widget.stretch > 0 ? 48.0 : 0.0;
@@ -730,6 +830,20 @@ class _GlassButtonState extends State<GlassButton>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.useSystemGlassStyle &&
+        widget.style != GlassButtonStyle.transparent &&
+        native_glass.LiquidGlass.isNativePlatform) {
+      return FutureBuilder<native_glass.LiquidGlassCapabilities>(
+        future: native_glass.LiquidGlass.capabilities(),
+        builder: (context, snapshot) => snapshot.data?.nativeGlass == true
+            ? _buildSystemGlassButton(context)
+            : _buildFlutterButton(context),
+      );
+    }
+    return _buildFlutterButton(context);
+  }
+
+  Widget _buildFlutterButton(BuildContext context) {
     // Resolve quality and theme — hoisted here so stretchWidget can branch on quality
     final effectiveQuality = GlassThemeHelpers.resolveQuality(
       context,
@@ -741,17 +855,20 @@ class _GlassButtonState extends State<GlassButton>
     final effectiveInteractionScale =
         widget.interactionScale ?? themeInteraction.interactionScale;
 
-    final resolvedGlowColors =
-        GlassThemeData.of(context).glowColorsFor(context);
+    final resolvedGlowColors = GlassThemeData.of(
+      context,
+    ).glowColorsFor(context);
     final isNativeGlow = widget.glowRadius == null;
     final isDark = GlassTheme.brightnessOf(context) == Brightness.dark;
     // Native specular sheen is subtle (~10% alpha in light mode, ~7% in dark mode)
     // to provide a delicate specular highlight on top of ambientBaseLight
     // without creating a dense, opaque white fog circle.
-    final nativeGlowColor =
-        isDark ? const Color(0x12FFFFFF) : const Color(0x1AFFFFFF);
+    final nativeGlowColor = isDark
+        ? const Color(0x12FFFFFF)
+        : const Color(0x1AFFFFFF);
 
-    final effectiveGlowColor = widget.glowColor ??
+    final effectiveGlowColor =
+        widget.glowColor ??
         (isNativeGlow ? nativeGlowColor : resolvedGlowColors.primary) ??
         CupertinoColors.white.withValues(alpha: 0.24);
     final effectiveGlowBlurRadius =
@@ -769,17 +886,18 @@ class _GlassButtonState extends State<GlassButton>
         alignment: widget.alignment,
         widthFactor: widget.width == null ? 1.0 : null,
         heightFactor: widget.height == null ? 1.0 : null,
-        child: widget.child ??
+        child:
+            widget.child ??
             IconTheme(
               data: IconThemeData(
-                color: widget.iconColor ??
+                color:
+                    widget.iconColor ??
                     (widget.style == GlassButtonStyle.prominent
                         ? CupertinoColors.white
-                        : (CupertinoTheme.of(context)
-                                .textTheme
-                                .textStyle
-                                .color ??
-                            CupertinoColors.label)),
+                        : (CupertinoTheme.of(
+                                context,
+                              ).textTheme.textStyle.color ??
+                              CupertinoColors.label)),
                 size: widget.iconSize,
               ),
               child: widget.icon ?? const SizedBox.shrink(),
@@ -796,14 +914,18 @@ class _GlassButtonState extends State<GlassButton>
     // The default lift is halved in dark mode, where the resting surface is
     // darker and the same overlay reads as a flash; an explicit value is
     // honoured unchanged.
-    final double effectiveAmbientBaseLight = widget.ambientBaseLight ??
+    final double effectiveAmbientBaseLight =
+        widget.ambientBaseLight ??
         (GlassTheme.brightnessOf(context) == Brightness.dark
             ? GlassDefaults.ambientBaseLightDark
             : GlassDefaults.ambientBaseLight);
 
     final ambientOverlay = AnimatedBuilder(
-      animation:
-          Listenable.merge([_saturationAnimation, _isHovered, _isFocused]),
+      animation: Listenable.merge([
+        _saturationAnimation,
+        _isHovered,
+        _isFocused,
+      ]),
       builder: (context, _) {
         double opacity = _saturationAnimation.value * effectiveAmbientBaseLight;
         if (_isFocused.value) {
@@ -815,8 +937,9 @@ class _GlassButtonState extends State<GlassButton>
         return Positioned.fill(
           child: IgnorePointer(
             child: ColoredBox(
-              color: CupertinoColors.white
-                  .withValues(alpha: opacity.clamp(0.0, 1.0)),
+              color: CupertinoColors.white.withValues(
+                alpha: opacity.clamp(0.0, 1.0),
+              ),
             ),
           ),
         );
@@ -827,10 +950,7 @@ class _GlassButtonState extends State<GlassButton>
     // while the surface behind it brightens, as it does natively.
     final contentWithAmbient = Stack(
       alignment: widget.alignment,
-      children: [
-        ambientOverlay,
-        contentWidget,
-      ],
+      children: [ambientOverlay, contentWidget],
     );
 
     // Resolve effective glow radius:
@@ -842,8 +962,9 @@ class _GlassButtonState extends State<GlassButton>
     final effectiveGlowRadius = widget.glowRadius ?? 1.6;
 
     // Resolve effective blur: null falls through to 16.0 for a creamy organic falloff.
-    final nativeGlowBlurRadius =
-        widget.glowRadius == null ? 16.0 : effectiveGlowBlurRadius;
+    final nativeGlowBlurRadius = widget.glowRadius == null
+        ? 16.0
+        : effectiveGlowBlurRadius;
 
     // This part is static relative to the glass saturation pulse.
     // clipper is passed directly to GlassGlow (not to AdaptiveGlass) so the
@@ -891,9 +1012,12 @@ class _GlassButtonState extends State<GlassButton>
           baseSettings = baseSettings.copyWith(
             thickness: (baseSettings.effectiveThickness * 2.5).clamp(30, 100),
             glassColor: baseSettings.glassColor.withValues(
-                alpha: (baseSettings.glassColor.a * 2.5).clamp(0.4, 0.9)),
-            lightIntensity:
-                (baseSettings.effectiveLightIntensity * 1.5).clamp(0.3, 1.0),
+              alpha: (baseSettings.glassColor.a * 2.5).clamp(0.4, 0.9),
+            ),
+            lightIntensity: (baseSettings.effectiveLightIntensity * 1.5).clamp(
+              0.3,
+              1.0,
+            ),
           );
         }
 
@@ -922,7 +1046,8 @@ class _GlassButtonState extends State<GlassButton>
           // Sized from the scale, so a 56 px button at 1.3 reserves 17 px; texture
           // only, no GPU cost at rest. Grouped buttons don't need this — they
           // share the parent layer.
-          clipExpansion: widget.useOwnLayer &&
+          clipExpansion:
+              widget.useOwnLayer &&
                   (effectiveInteractionScale == null ||
                       effectiveInteractionScale > 1.0)
               ? EdgeInsets.all(_pressHeadroom(effectiveInteractionScale))
@@ -952,7 +1077,8 @@ class _GlassButtonState extends State<GlassButton>
     //   correct resolution even inside a RepaintBoundary.
 
     final bool hasStretch = widget.stretch > 0;
-    final bool skipBoundary = effectiveQuality == GlassQuality.minimal ||
+    final bool skipBoundary =
+        effectiveQuality == GlassQuality.minimal ||
         (effectiveQuality == GlassQuality.premium && hasStretch);
 
     final stretchContent = LiquidStretch(
@@ -971,22 +1097,21 @@ class _GlassButtonState extends State<GlassButton>
       anchorStretch: widget.anchorStretch != true
           ? widget.anchorStretch
           : themeInteraction.anchorStretch ?? widget.anchorStretch,
-      anchorStretchSettings: widget.anchorStretchSettings ??
+      anchorStretchSettings:
+          widget.anchorStretchSettings ??
           themeInteraction.anchorStretchSettings ??
           AnchorStretchSettings.nativeTremor,
       child: glassWidget,
     );
 
-    final stretchWidget =
-        skipBoundary ? stretchContent : RepaintBoundary(child: stretchContent);
+    final stretchWidget = skipBoundary
+        ? stretchContent
+        : RepaintBoundary(child: stretchContent);
 
     // Apply opacity when disabled
     final innerWidget = widget.enabled
         ? stretchWidget
-        : Opacity(
-            opacity: 0.5,
-            child: stretchWidget,
-          );
+        : Opacity(opacity: 0.5, child: stretchWidget);
 
     // ---------------------------------------------------------------------------
     // GlassFocusRegion abstracts the focus ring painting and keyboard intent
@@ -1062,6 +1187,62 @@ class _GlassButtonState extends State<GlassButton>
   }
 }
 
+class _NativeSystemGlassButtonSurface extends StatefulWidget {
+  const _NativeSystemGlassButtonSurface({
+    required this.prominent,
+    required this.capsule,
+    required this.enabled,
+    required this.isDark,
+    required this.onCreated,
+  });
+
+  final bool prominent;
+  final bool capsule;
+  final bool enabled;
+  final bool isDark;
+  final ValueChanged<MethodChannel> onCreated;
+
+  Map<String, Object?> get _params => {
+    'prominent': prominent,
+    'capsule': capsule,
+    'enabled': enabled,
+    'dark': isDark,
+  };
+
+  @override
+  State<_NativeSystemGlassButtonSurface> createState() =>
+      _NativeSystemGlassButtonSurfaceState();
+}
+
+class _NativeSystemGlassButtonSurfaceState
+    extends State<_NativeSystemGlassButtonSurface> {
+  MethodChannel? _channel;
+
+  @override
+  void didUpdateWidget(_NativeSystemGlassButtonSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.prominent != oldWidget.prominent ||
+        widget.capsule != oldWidget.capsule ||
+        widget.enabled != oldWidget.enabled ||
+        widget.isDark != oldWidget.isDark) {
+      _channel?.invokeMethod<void>('update', widget._params);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => UiKitView(
+    viewType: 'neo_cupertino/system_glass_button',
+    creationParams: widget._params,
+    creationParamsCodec: const StandardMessageCodec(),
+    hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+    onPlatformViewCreated: (id) {
+      final channel = MethodChannel('neo_cupertino/system_glass_button_$id');
+      _channel = channel;
+      widget.onCreated(channel);
+    },
+  );
+}
+
 /// Clips to a [ShapeBorder]'s outer path, optionally expanded by [expansion]
 /// pixels on all sides.
 ///
@@ -1070,10 +1251,7 @@ class _GlassButtonState extends State<GlassButton>
 /// shape boundary. During stretch interaction ([expansion] → 0), the clip
 /// tightens to the exact shape boundary, hiding rasterization artifacts.
 class _ExpandedShapeClipper extends CustomClipper<Path> {
-  _ExpandedShapeClipper({
-    required this.shape,
-    this.expansion = 0.0,
-  });
+  _ExpandedShapeClipper({required this.shape, this.expansion = 0.0});
 
   final ShapeBorder shape;
   final double expansion;
