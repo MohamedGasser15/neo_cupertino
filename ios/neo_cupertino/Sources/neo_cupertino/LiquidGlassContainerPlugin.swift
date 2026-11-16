@@ -14,6 +14,10 @@ public class LiquidGlassContainerPlugin: NSObject, FlutterPlugin {
       withId: "neo_cupertino/glass_view")
 
     registrar.register(
+      NativeSystemGlassButtonFactory(messenger: registrar.messenger()),
+      withId: "neo_cupertino/system_glass_button")
+
+    registrar.register(
       NativeTabBarViewFactory(messenger: registrar.messenger()),
       withId: "neo_cupertino/tab_bar")
   }
@@ -30,6 +34,93 @@ public class LiquidGlassContainerPlugin: NSObject, FlutterPlugin {
       ])
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+}
+
+/// Hosts Apple's own glass button configuration while Flutter supplies the
+/// button's content and gesture handling above this transparent platform view.
+final class NativeSystemGlassButtonFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    FlutterStandardMessageCodec.sharedInstance()
+  }
+
+  func create(
+    withFrame frame: CGRect,
+    viewIdentifier viewId: Int64,
+    arguments args: Any?
+  ) -> FlutterPlatformView {
+    NativeSystemGlassButtonPlatformView(
+      frame: frame,
+      viewId: viewId,
+      args: args as? [String: Any] ?? [:],
+      messenger: messenger)
+  }
+}
+
+final class NativeSystemGlassButtonPlatformView: NSObject, FlutterPlatformView {
+  private let container: UIView
+  private let button = UIButton(type: .system)
+  private let channel: FlutterMethodChannel
+
+  init(frame: CGRect, viewId: Int64, args: [String: Any], messenger: FlutterBinaryMessenger) {
+    container = UIView(frame: frame)
+    channel = FlutterMethodChannel(
+      name: "neo_cupertino/system_glass_button_\(viewId)",
+      binaryMessenger: messenger)
+    super.init()
+
+    container.backgroundColor = .clear
+    button.translatesAutoresizingMaskIntoConstraints = false
+    button.isUserInteractionEnabled = false
+    container.addSubview(button)
+    NSLayoutConstraint.activate([
+      button.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      button.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      button.topAnchor.constraint(equalTo: container.topAnchor),
+      button.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+    apply(args)
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else { return result(FlutterMethodNotImplemented) }
+      switch call.method {
+      case "update":
+        self.apply(call.arguments as? [String: Any] ?? [:])
+        result(nil)
+      case "pressed":
+        self.button.isHighlighted = call.arguments as? Bool ?? false
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  func view() -> UIView { container }
+
+  private func apply(_ args: [String: Any]) {
+    if let dark = args["dark"] as? Bool {
+      container.overrideUserInterfaceStyle = dark ? .dark : .light
+    }
+    button.isEnabled = args["enabled"] as? Bool ?? true
+    if #available(iOS 26.0, *) {
+      var configuration = (args["prominent"] as? Bool ?? false)
+        ? UIButton.Configuration.prominentGlass()
+        : UIButton.Configuration.glass()
+      configuration.cornerStyle = (args["capsule"] as? Bool ?? true) ? .capsule : .dynamic
+      configuration.contentInsets = .zero
+      button.configuration = configuration
+    } else {
+      // The Flutter implementation remains the fallback below iOS 26.
+      button.configuration = .plain()
+      button.backgroundColor = .clear
     }
   }
 }
